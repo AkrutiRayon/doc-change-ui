@@ -1,8 +1,12 @@
 import akana from "@/assets/logos/akana.png";
 import blazemeter from "@/assets/logos/blazemeter.png";
+import jrebel from "@/assets/logos/jrebel.png";
+import openlogic from "@/assets/logos/openlogic.png";
 import p4 from "@/assets/logos/p4.png";
 import perfecto from "@/assets/logos/perfecto.png";
 import puppet from "@/assets/logos/puppet.png";
+import qac from "@/assets/logos/qac.png";
+import zend from "@/assets/logos/zend.png";
 
 export type Product = {
   id: string;
