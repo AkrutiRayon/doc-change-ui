@@ -52,6 +52,20 @@ export const products: Product[] = [
     category: "Infrastructure",
     logo: puppet,
   },
+  {
+    id: "qac",
+    name: "QAC",
+    description: "Static code analysis for C and C++ quality",
+    category: "Code Quality",
+    logo: qac,
+  },
+  {
+    id: "zend",
+    name: "Zend",
+    description: "Enterprise PHP application development and support",
+    category: "PHP",
+    logo: zend,
+  },
 ];
 
 export const getProduct = (id: string) => products.find((p) => p.id === id);
