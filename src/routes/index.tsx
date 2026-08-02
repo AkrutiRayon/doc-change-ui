@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { products } from "@/data/products";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -65,11 +65,9 @@ function Index() {
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
-            <Link
+            <article
               key={p.id}
-              to="/$productId"
-              params={{ productId: p.id }}
-              className="group flex items-start gap-4 rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-foreground hover:shadow-lg"
+              className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-foreground hover:shadow-lg"
             >
               <img
                 src={p.logo}
@@ -84,17 +82,7 @@ function Index() {
                   {p.category}
                 </span>
               </div>
-              <svg
-                className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </Link>
+            </article>
           ))}
         </div>
 
