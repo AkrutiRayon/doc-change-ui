@@ -1,8 +1,12 @@
 import akana from "@/assets/logos/akana.png";
 import blazemeter from "@/assets/logos/blazemeter.png";
+import jrebel from "@/assets/logos/jrebel.png";
+import openlogic from "@/assets/logos/openlogic.png";
 import p4 from "@/assets/logos/p4.png";
 import perfecto from "@/assets/logos/perfecto.png";
 import puppet from "@/assets/logos/puppet.png";
+import qac from "@/assets/logos/qac.png";
+import zend from "@/assets/logos/zend.png";
 
 export type Product = {
   id: string;
@@ -28,6 +32,20 @@ export const products: Product[] = [
     logo: blazemeter,
   },
   {
+    id: "jrebel",
+    name: "JRebel",
+    description: "Java development productivity and instant reload",
+    category: "Java",
+    logo: jrebel,
+  },
+  {
+    id: "openlogic",
+    name: "OpenLogic",
+    description: "Enterprise open source support and services",
+    category: "Open Source",
+    logo: openlogic,
+  },
+  {
     id: "p4",
     name: "P4",
     description: "Version Control + Code Review",
@@ -47,6 +65,20 @@ export const products: Product[] = [
     description: "Infrastructure Automation & Compliance",
     category: "Infrastructure",
     logo: puppet,
+  },
+  {
+    id: "qac",
+    name: "QAC",
+    description: "Static code analysis for C and C++ quality",
+    category: "Code Quality",
+    logo: qac,
+  },
+  {
+    id: "zend",
+    name: "Zend",
+    description: "Enterprise PHP application development and support",
+    category: "PHP",
+    logo: zend,
   },
 ];
 
