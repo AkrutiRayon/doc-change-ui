@@ -2,10 +2,16 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SubscribeModal } from "@/components/SubscribeModal";
-import { getProduct, updatesByProduct, type DocTag } from "@/data/products";
+import {
+  getProduct,
+  updatesByProduct,
+  type DocTag,
+  type DocUpdate,
+  type Product,
+} from "@/data/products";
 
 export const Route = createFileRoute("/$productId")({
-  loader: ({ params }) => {
+  loader: ({ params }): { product: Product; updates: DocUpdate[] } => {
     const product = getProduct(params.productId);
     if (!product) throw notFound();
     return { product, updates: updatesByProduct[product.id] ?? [] };
@@ -59,7 +65,7 @@ function ProductPage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return updates.filter((u) => {
+    return updates.filter((u: DocUpdate) => {
       if (tab !== "all" && u.tag !== tab) return false;
       if (days) {
         const cutoff = Date.now() - Number(days) * 86400000;
@@ -170,7 +176,7 @@ function ProductPage() {
         </div>
 
         <div className="mt-6 space-y-4">
-          {visible.map((u) => {
+          {visible.map((u: DocUpdate) => {
             const isLong = u.whatChanged.length > 180;
             const isOpen = expanded[u.id];
             return (
