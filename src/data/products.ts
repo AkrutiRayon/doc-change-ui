@@ -32,6 +32,20 @@ export const products: Product[] = [
     logo: blazemeter,
   },
   {
+    id: "jrebel",
+    name: "JRebel",
+    description: "Java development productivity and instant reload",
+    category: "Java",
+    logo: jrebel,
+  },
+  {
+    id: "openlogic",
+    name: "OpenLogic",
+    description: "Enterprise open source support and services",
+    category: "Open Source",
+    logo: openlogic,
+  },
+  {
     id: "p4",
     name: "P4",
     description: "Version Control + Code Review",
