@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { products } from "@/data/products";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -64,26 +64,47 @@ function Index() {
         </div>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((p) => (
-            <article
-              key={p.id}
-              className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-foreground hover:shadow-lg"
-            >
-              <img
-                src={p.logo}
-                alt={`${p.name} logo`}
-                loading="lazy"
-                className="h-12 w-12 shrink-0 object-contain"
-              />
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold tracking-tight">{p.name}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{p.description}</p>
-                <span className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
-                  {p.category}
-                </span>
-              </div>
-            </article>
-          ))}
+          {filtered.map((p) => {
+            const cardContent = (
+              <>
+                <img
+                  src={p.logo}
+                  alt={`${p.name} logo`}
+                  loading="lazy"
+                  className="h-12 w-12 shrink-0 object-contain"
+                />
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-semibold tracking-tight">{p.name}</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">{p.description}</p>
+                  <span className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+                    {p.category}
+                  </span>
+                </div>
+              </>
+            );
+
+            if (p.id === "blazemeter") {
+              return (
+                <Link
+                  key={p.id}
+                  to="/products/$productId"
+                  params={{ productId: p.id }}
+                  className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:border-foreground hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {cardContent}
+                </Link>
+              );
+            }
+
+            return (
+              <article
+                key={p.id}
+                className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 opacity-80"
+              >
+                {cardContent}
+              </article>
+            );
+          })}
         </div>
 
         {filtered.length === 0 && (
