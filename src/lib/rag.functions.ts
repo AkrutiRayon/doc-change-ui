@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const RAG_BASE_URL =
-  "http://vs345305svc232297.mock-eu.blazemeter.com/api/v1/rag-go";
+  "http://infer.hawk-llm.ai/api/v1/rag-go";
 
 const InputSchema = z.object({
   queryText: z.string().min(1),
@@ -46,7 +46,7 @@ export const runRagSearch = createServerFn({ method: "POST" })
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Mock API error ${response.status}: ${text}`);
+      throw new Error(`RAG API error ${response.status}: ${text}`);
     }
 
     return (await response.json()) as RagResponse;
