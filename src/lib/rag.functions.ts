@@ -31,17 +31,25 @@ export const runRagSearch = createServerFn({ method: "POST" })
     const endpointUrl =
       data.endpoint === "generate-doc" ? `${RAG_BASE_URL}/generate-doc` : RAG_BASE_URL;
 
+    const body = JSON.stringify({
+      query_text: data.queryText,
+      repo_id: data.repoId,
+      type: data.type,
+      limit: data.limit,
+    });
+
+    console.log("[RAG UI DEBUG]", {
+      endpoint: data.endpoint,
+      url: endpointUrl,
+      body,
+    });
+
     const response = await fetch(endpointUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        query_text: data.queryText,
-        repo_id: data.repoId,
-        type: data.type,
-        limit: data.limit,
-      }),
+      body,
     });
 
     if (!response.ok) {

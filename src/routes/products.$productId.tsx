@@ -5,13 +5,7 @@ import { getProduct } from "@/data/products";
 import { runRagSearch } from "@/lib/rag.functions";
 import { Loader2 } from "lucide-react";
 
-import {
-  ArrowLeft,
-  Search,
-  Sparkles,
-  FileText,
-  Download,
-} from "lucide-react";
+import { ArrowLeft, Search, Sparkles, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
@@ -72,6 +67,17 @@ const EXAMPLE_PROMPTS = [
 ];
 
 type ComponentName = (typeof COMPONENTS)[number];
+type DocDecisionResponse = {
+  status: string;
+  documentLinks: DocumentLink[];
+  markdownLabel: "changes_markdown" | "body_markdown";
+  markdown: string;
+  warnings: string[];
+};
+type DocumentLink = {
+  label: string;
+  href?: string;
+};
 
 function Workspace() {
   const { productId } = Route.useParams();
@@ -88,6 +94,7 @@ function Workspace() {
   const [aiText, setAiText] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string>("");
+  const [docNeeded, setDocNeeded] = useState(false);
   const ragSearch = useServerFn(runRagSearch);
 
   const handleSearch = async () => {
@@ -112,10 +119,11 @@ function Workspace() {
           repoId: REPO_ID_BY_COMPONENT[component],
           type: mode,
           limit,
-          endpoint: "search",
+          endpoint: docNeeded ? "generate-doc" : "search",
         },
       });
-      setAiText(data.answer);
+
+      setAiText(normalizeRagAnswer(docNeeded ? data : data.answer));
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "Failed to fetch RAG API response");
     } finally {
@@ -167,6 +175,17 @@ function Workspace() {
               />
             </div>
 
+            <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+              <Checkbox
+                checked={docNeeded}
+                onCheckedChange={(checked) => setDocNeeded(Boolean(checked))}
+                id="doc-needed"
+              />
+              <Label htmlFor="doc-needed" className="cursor-pointer text-sm">
+                Doc needed
+              </Label>
+            </div>
+
             <ToggleGroup
               type="single"
               value={mode}
@@ -181,8 +200,8 @@ function Workspace() {
               </ToggleGroupItem>
             </ToggleGroup>
 
-            <Select value={team} onValueChange={setTeam}>
-              <SelectTrigger className="h-10 w-[130px]">
+            <Select value={team} onValueChange={setTeam} disabled>
+              <SelectTrigger className="h-10 w-[130px] opacity-50">
                 <SelectValue placeholder="Team" />
               </SelectTrigger>
               <SelectContent>
@@ -210,10 +229,7 @@ function Workspace() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={String(limit)}
-              onValueChange={(value) => setLimit(Number(value))}
-            >
+            <Select value={String(limit)} onValueChange={(value) => setLimit(Number(value))}>
               <SelectTrigger className="h-10 w-[95px]">
                 <SelectValue placeholder="Limit" />
               </SelectTrigger>
@@ -253,16 +269,14 @@ function Workspace() {
                     <Sparkles className="h-3.5 w-3.5" />
                     {mode === "standard" ? "AI Release Summary" : "AI Answer"}
                   </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <Download className="h-4 w-4" />
-                      Export
-                    </Button>
-                    <Button size="sm" className="gap-1.5" onClick={() => setGenOpen(true)}>
-                      <FileText className="h-4 w-4" />
-                      Generate Document
-                    </Button>
-                  </div>
+                  {!docNeeded && (
+                    <div className="flex shrink-0 gap-2">
+                      <Button size="sm" className="gap-1.5" onClick={() => setGenOpen(true)}>
+                        <FileText className="h-4 w-4" />
+                        Generate Document
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2">
                   {aiLoading ? (
@@ -273,13 +287,21 @@ function Workspace() {
                   ) : aiError ? (
                     <p className="text-sm text-destructive">{aiError}</p>
                   ) : aiText ? (
-                    <MarkdownAnswer markdown={aiText} />
+                    docNeeded ? (
+                      <DocDecisionResult
+                        aiText={aiText}
+                        query={query}
+                        component={component || productName}
+                        repoId={component ? REPO_ID_BY_COMPONENT[component] : ""}
+                      />
+                    ) : (
+                      <MarkdownAnswer markdown={aiText} />
+                    )
                   ) : (
                     <p className="text-sm text-muted-foreground">No response yet.</p>
                   )}
                 </div>
               </div>
-
             </>
           )}
         </section>
@@ -299,7 +321,15 @@ function Workspace() {
   );
 }
 
-function MarkdownAnswer({ markdown }: { markdown: string }) {
+function MarkdownAnswer({
+  markdown,
+  showToc = true,
+  framed = true,
+}: {
+  markdown: string;
+  showToc?: boolean;
+  framed?: boolean;
+}) {
   const lines = markdown.split("\n");
   const blocks: React.ReactNode[] = [];
   const headings: { id: string; text: string; level: number }[] = [];
@@ -312,7 +342,7 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
   const flushList = () => {
     if (listItems.length > 0) {
       blocks.push(
-        <ul key={`ul-${blocks.length}`} className="my-3 list-disc space-y-1 pl-6">
+        <ul key={`ul-${blocks.length}`} className="my-5 list-disc space-y-3 pl-6 text-slate-700">
           {listItems.map((item, index) => (
             <li key={index}>{renderInlineMarkdown(item)}</li>
           ))}
@@ -323,7 +353,7 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
 
     if (orderedItems.length > 0) {
       blocks.push(
-        <ol key={`ol-${blocks.length}`} className="my-3 list-decimal space-y-1 pl-6">
+        <ol key={`ol-${blocks.length}`} className="my-5 list-decimal space-y-3 pl-6 text-slate-700">
           {orderedItems.map((item, index) => (
             <li key={index}>{renderInlineMarkdown(item)}</li>
           ))}
@@ -337,10 +367,10 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
     blocks.push(
       <div
         key={`code-${blocks.length}`}
-        className="my-5 overflow-hidden rounded-lg border border-border bg-[#f7f7f8] shadow-sm"
+        className="my-5 overflow-hidden rounded-lg border border-border bg-slate-950 text-slate-100 shadow-sm"
       >
         <pre className="overflow-x-auto px-5 py-4 text-[15px] leading-7">
-          <code className="font-mono text-foreground">
+          <code className="font-mono text-slate-100">
             {renderCodeWithHighlight(codeLines.join("\n"))}
           </code>
         </pre>
@@ -385,19 +415,31 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
       const content = renderInlineMarkdown(headingText);
       if (level === 1) {
         blocks.push(
-          <h1 id={headingId} key={`h-${blocks.length}`} className="mb-3 mt-4 scroll-mt-20 text-2xl font-semibold">
+          <h1
+            id={headingId}
+            key={`h-${blocks.length}`}
+            className="mb-4 mt-6 scroll-mt-20 text-3xl font-semibold tracking-tight text-slate-950"
+          >
             {content}
           </h1>,
         );
       } else if (level === 2) {
         blocks.push(
-          <h2 id={headingId} key={`h-${blocks.length}`} className="mb-2 mt-5 scroll-mt-20 text-xl font-semibold">
+          <h2
+            id={headingId}
+            key={`h-${blocks.length}`}
+            className="mb-3 mt-6 scroll-mt-20 text-2xl font-semibold tracking-tight text-slate-900"
+          >
             {content}
           </h2>,
         );
       } else {
         blocks.push(
-          <h3 id={headingId} key={`h-${blocks.length}`} className="mb-2 mt-4 scroll-mt-20 text-base font-semibold">
+          <h3
+            id={headingId}
+            key={`h-${blocks.length}`}
+            className="mb-3 mt-5 scroll-mt-20 text-xl font-semibold text-slate-900"
+          >
             {content}
           </h3>,
         );
@@ -421,7 +463,7 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
 
     flushList();
     blocks.push(
-      <p key={`p-${blocks.length}`} className="my-2">
+      <p key={`p-${blocks.length}`} className="my-4 text-slate-700">
         {renderInlineMarkdown(trimmed)}
       </p>,
     );
@@ -431,9 +473,15 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
   if (inCodeBlock) flushCodeBlock();
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
-      <article className="min-w-0 text-base leading-8 text-foreground">{blocks}</article>
-      {headings.length > 0 && (
+    <div className="markdown-body grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <article
+        className={`min-w-0 text-base leading-8 text-foreground ${
+          framed ? "rounded-3xl border border-border bg-card p-6 shadow-sm" : ""
+        }`}
+      >
+        {blocks}
+      </article>
+      {showToc && headings.length > 0 && (
         <aside className="hidden border-l border-border pl-5 lg:block">
           <nav className="sticky top-20 max-h-[calc(100vh-7rem)] overflow-auto text-sm">
             <div className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -459,6 +507,126 @@ function MarkdownAnswer({ markdown }: { markdown: string }) {
   );
 }
 
+function DocDecisionResult({
+  aiText,
+  query,
+  component,
+  repoId,
+}: {
+  aiText: string;
+  query: string;
+  component: string;
+  repoId: string;
+}) {
+  const [genOpen, setGenOpen] = useState(false);
+  const decision = parseDocDecisionResponse(aiText, repoId);
+  const documentTitle = generateDocumentTitle(query, decision.markdown, component);
+  const canDownload = Boolean(decision.markdown.trim());
+
+  return (
+    <div className="grid gap-4">
+      <ResultBox title="Status">
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-foreground">
+            {decision.status || "Status not provided"}
+          </p>
+          {shouldShowDocumentLinks(decision.status) && decision.documentLinks.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Document
+              </div>
+              <ul className="space-y-1 text-sm">
+                {decision.documentLinks.map((doc, index) => (
+                  <li key={`${doc.label}-${index}`}>
+                    {doc.href ? (
+                      <a
+                        href={doc.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        {doc.label}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">{doc.label}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </ResultBox>
+
+      <ResultBox
+        title={decision.markdownLabel}
+        action={
+          <Button
+            size="sm"
+            className="gap-1.5"
+            disabled={!canDownload}
+            onClick={() => setGenOpen(true)}
+          >
+            <FileText className="h-4 w-4" />
+            Generate Document
+          </Button>
+        }
+      >
+        {canDownload ? (
+          <MarkdownAnswer markdown={decision.markdown} showToc={false} framed={false} />
+        ) : (
+          <p className="text-sm text-muted-foreground">No markdown content provided.</p>
+        )}
+      </ResultBox>
+
+      <ResultBox title="Warnings">
+        {decision.warnings.length > 0 ? (
+          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+            {decision.warnings.map((warning, index) => (
+              <li key={`${warning}-${index}`}>{warning}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">No warnings.</p>
+        )}
+      </ResultBox>
+
+      <GenerateDocumentDialog
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        productName={component}
+        query={query}
+        aiText={decision.markdown}
+        component=""
+        mode="direct"
+        limit={0}
+        providedMarkdown={decision.markdown}
+        providedTitle={documentTitle}
+      />
+    </div>
+  );
+}
+
+function ResultBox({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function renderInlineMarkdown(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
 
@@ -471,7 +639,7 @@ function renderInlineMarkdown(text: string) {
       return (
         <code
           key={index}
-          className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]"
+          className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.9em] text-slate-950"
         >
           {part.slice(1, -1)}
         </code>
@@ -506,7 +674,11 @@ function renderCodeWithHighlight(code: string) {
       );
     }
 
-    if (/^\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await)\b$/.test(part)) {
+    if (
+      /^\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await)\b$/.test(
+        part,
+      )
+    ) {
       return (
         <span key={index} className="font-medium text-pink-600">
           {part}
@@ -587,9 +759,7 @@ function EmptyState({ onPick }: { onPick: (p: string) => void }) {
         <Sparkles className="h-5 w-5 text-muted-foreground" />
       </div>
       <h2 className="text-lg font-semibold">Ask AI about your code and docs</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Try one of these prompts to get started
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Try one of these prompts to get started</p>
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         {EXAMPLE_PROMPTS.map((p) => (
           <button
@@ -614,6 +784,8 @@ function GenerateDocumentDialog({
   component,
   mode,
   limit,
+  providedMarkdown,
+  providedTitle,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -623,9 +795,12 @@ function GenerateDocumentDialog({
   component: ComponentName | "";
   mode: "standard" | "direct";
   limit: number;
+  providedMarkdown?: string;
+  providedTitle?: string;
 }) {
   const [title, setTitle] = useState("");
   const [lastAutoTitle, setLastAutoTitle] = useState("");
+  const [hasCustomTitle, setHasCustomTitle] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
   const [docError, setDocError] = useState("");
   const ragSearch = useServerFn(runRagSearch);
@@ -633,17 +808,31 @@ function GenerateDocumentDialog({
   useEffect(() => {
     if (!open) return;
 
-    const nextTitle = generateDocumentTitle(query, aiText, component || productName);
+    const nextTitle = providedTitle || generateDocumentTitle(query, aiText, component || productName);
 
-    if (!title || title === lastAutoTitle) {
+    if (!hasCustomTitle) {
       setTitle(nextTitle);
       setLastAutoTitle(nextTitle);
     }
-  }, [open, productName, query, title, lastAutoTitle]);
+  }, [open, productName, query, aiText, component, hasCustomTitle, providedTitle]);
 
   const handleGenerate = async () => {
+    const resolvedTitle =
+      title.trim() ||
+      lastAutoTitle ||
+      providedTitle ||
+      generateDocumentTitle(query, aiText, component || productName);
+
     if (!query.trim()) {
       setDocError("Enter a query before generating a document.");
+      return;
+    }
+
+    const immediateMarkdown = (providedMarkdown || aiText || "").trim();
+    if (immediateMarkdown) {
+      const markdown = addTitleToMarkdown(resolvedTitle, immediateMarkdown);
+      downloadMarkdownDocument(resolvedTitle, markdown);
+      onOpenChange(false);
       return;
     }
 
@@ -652,7 +841,6 @@ function GenerateDocumentDialog({
       return;
     }
 
-    const documentTitle = title.trim() || lastAutoTitle || generateDocumentTitle(query, aiText, component);
     setDocLoading(true);
     setDocError("");
 
@@ -667,8 +855,10 @@ function GenerateDocumentDialog({
         },
       });
 
-      const markdown = addTitleToMarkdown(documentTitle, data.answer);
-      downloadFormattedDocument(documentTitle, markdown);
+      const generatedAnswer = normalizeRagAnswer(data);
+      const generatedDoc = parseDocDecisionResponse(generatedAnswer);
+      const markdown = addTitleToMarkdown(resolvedTitle, generatedDoc.markdown || generatedAnswer);
+      downloadMarkdownDocument(resolvedTitle, markdown);
       onOpenChange(false);
     } catch (e) {
       setDocError(e instanceof Error ? e.message : "Failed to generate document.");
@@ -682,9 +872,7 @@ function GenerateDocumentDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Generate Document</DialogTitle>
-          <DialogDescription>
-            Create a document from the current search results.
-          </DialogDescription>
+          <DialogDescription>Create a document from the current search results.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -693,10 +881,14 @@ function GenerateDocumentDialog({
             <Input
               id="doc-title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setHasCustomTitle(true);
+              }}
               placeholder="e.g. Using K6 Executor in Taurus"
             />
           </div>
+
           {docError && <p className="text-sm text-destructive">{docError}</p>}
         </div>
 
@@ -746,13 +938,203 @@ function addTitleToMarkdown(title: string, markdown: string) {
   return `# ${title}\n\n${content}`;
 }
 
-function downloadFormattedDocument(title: string, markdown: string) {
-  const html = buildFormattedDocumentHtml(title, markdown);
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+function normalizeRagAnswer(answer: unknown) {
+  if (typeof answer === "string") return answer;
+  return JSON.stringify(answer ?? "", null, 2);
+}
+
+function parseDocDecisionResponse(value: string, repoId = ""): DocDecisionResponse {
+  const parsed = parseJsonLike(value);
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const record = parsed as Record<string, unknown>;
+    const markdownField = findDocMarkdownField(record);
+
+    if (!markdownField.markdown && record.answer !== undefined) {
+      return parseDocDecisionResponse(normalizeRagAnswer(record.answer), repoId);
+    }
+
+    return {
+      status: stringValue(record.status),
+      documentLinks: findDocumentLinks(record, repoId),
+      markdownLabel: markdownField.label,
+      markdown: markdownField.markdown,
+      warnings: arrayOfStrings(record.warnings),
+    };
+  }
+
+  return {
+    status: "",
+    documentLinks: [],
+    markdownLabel: "changes_markdown",
+    markdown: value,
+    warnings: [],
+  };
+}
+
+function shouldShowDocumentLinks(status: string) {
+  return status === "update_required" || status === "no_changes_required";
+}
+
+function findDocumentLinks(record: Record<string, unknown>, repoId: string): DocumentLink[] {
+  const docs = [
+    ...arrayOfObjects(record.matched_docs),
+    ...arrayOfObjects(record.matchedDocs),
+    ...arrayOfObjects(record.documents),
+    ...arrayOfObjects(record.docs),
+  ];
+  const targetDocRef = stringValue(objectValue(record.delta)?.target_doc_ref);
+  const links = docs
+    .map((doc) => {
+      const rawHref =
+        stringValue(doc.url) ||
+        stringValue(doc.link) ||
+        stringValue(doc.href) ||
+        stringValue(doc.html_url) ||
+        stringValue(doc.htmlUrl) ||
+        stringValue(doc.web_url) ||
+        stringValue(doc.webUrl) ||
+        stringValue(doc.document_url) ||
+        stringValue(doc.documentUrl) ||
+        stringValue(doc.document_link) ||
+        stringValue(doc.documentLink) ||
+        stringValue(doc.source_url) ||
+        stringValue(doc.sourceUrl) ||
+        stringValue(doc.doc_url) ||
+        stringValue(doc.docUrl);
+      const docRef =
+        stringValue(doc.doc_ref) ||
+        stringValue(doc.docRef) ||
+        stringValue(doc.path) ||
+        stringValue(doc.file_path) ||
+        stringValue(doc.filePath);
+      const href = normalizeDocumentHref(rawHref) || buildRepoDocumentHref(repoId, docRef);
+      const label = stringValue(doc.title) || docRef || href;
+
+      if (!label) return null;
+      return { label, href: href || undefined };
+    })
+    .filter(Boolean) as DocumentLink[];
+
+  if (links.length > 0) return dedupeDocumentLinks(links);
+
+  return targetDocRef
+    ? [
+        {
+          label: targetDocRef,
+          href: buildRepoDocumentHref(repoId, targetDocRef),
+        },
+      ]
+    : [];
+}
+
+function normalizeDocumentHref(href: string) {
+  if (!href) return "";
+  if (/^https?:\/\//i.test(href)) return href;
+  return "";
+}
+
+function buildRepoDocumentHref(repoId: string, docRef: string) {
+  if (!repoId || !docRef) return undefined;
+  const normalizedRepo = repoId.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const normalizedDocRef = docRef.replace(/^\/+/, "");
+
+  if (!normalizedRepo.startsWith("github.com/")) return undefined;
+
+  return `https://${normalizedRepo}/blob/HEAD/${encodeURI(normalizedDocRef)}`;
+}
+
+function findDocMarkdownField(record: Record<string, unknown>): {
+  label: "changes_markdown" | "body_markdown";
+  markdown: string;
+} {
+  const containers = [
+    record,
+    objectValue(record.delta),
+    objectValue(record.document),
+    objectValue(record.result),
+  ].filter(Boolean) as Record<string, unknown>[];
+
+  for (const container of containers) {
+    const changesMarkdown =
+      stringValue(container.changes_markdown) || stringValue(container.changesMarkdown);
+    if (changesMarkdown) {
+      return { label: "changes_markdown", markdown: changesMarkdown };
+    }
+
+    const bodyMarkdown =
+      stringValue(container.body_markdown) || stringValue(container.bodyMarkdown);
+    if (bodyMarkdown) {
+      return { label: "body_markdown", markdown: bodyMarkdown };
+    }
+  }
+
+  return { label: "changes_markdown", markdown: "" };
+}
+
+function parseJsonLike(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    const fenced = value.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (!fenced) return null;
+
+    try {
+      return JSON.parse(fenced[1]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function objectValue(value: unknown) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return null;
+}
+
+function arrayOfObjects(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item),
+  );
+}
+
+function dedupeDocumentLinks(links: DocumentLink[]) {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const key = `${link.label}:${link.href ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function arrayOfStrings(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) return [value];
+
+  return [];
+}
+
+function downloadMarkdownDocument(title: string, markdown: string) {
+  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${slugify(title)}.html`;
+  anchor.download = `${slugify(title)}.md`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -956,9 +1338,7 @@ function parseMarkdownForDocument(markdown: string) {
   };
 
   const flushCodeBlock = () => {
-    body.push(
-      `<pre><code>${renderCodeWithHighlightHtml(codeLines.join("\n"))}</code></pre>`,
-    );
+    body.push(`<pre><code>${renderCodeWithHighlightHtml(codeLines.join("\n"))}</code></pre>`);
     codeLines = [];
   };
 
@@ -993,9 +1373,7 @@ function parseMarkdownForDocument(markdown: string) {
       const headingText = heading[2];
       const id = `${slugifyHeading(headingText)}-${headings.length}`;
       headings.push({ id, text: stripMarkdown(headingText), level });
-      body.push(
-        `<h${level} id="${id}">${renderInlineMarkdownHtml(headingText)}</h${level}>`,
-      );
+      body.push(`<h${level} id="${id}">${renderInlineMarkdownHtml(headingText)}</h${level}>`);
       return;
     }
 
@@ -1052,7 +1430,11 @@ function renderCodeWithHighlightHtml(code: string) {
 
       if (/^(\/\/|#).*/.test(part)) return `<span class="tok-comment">${escaped}</span>`;
       if (/^["'`]/.test(part)) return `<span class="tok-string">${escaped}</span>`;
-      if (/^\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await)\b$/.test(part)) {
+      if (
+        /^\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await)\b$/.test(
+          part,
+        )
+      ) {
         return `<span class="tok-keyword">${escaped}</span>`;
       }
       if (/^\b(?:settings|env)\b$/.test(part) || /^[A-Za-z_][\w.-]*(?=\s*:)/.test(part)) {
