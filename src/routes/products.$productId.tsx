@@ -3,13 +3,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { getProduct } from "@/data/products";
 import { runRagSearch } from "@/lib/rag.functions";
-import { Loader2 } from "lucide-react";
-
-import { ArrowLeft, Search, Sparkles, FileText } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -27,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
 
@@ -78,6 +78,23 @@ type DocumentLink = {
   label: string;
   href?: string;
 };
+type UiRagRequest = {
+  queryText: string;
+  repoId: string;
+  type: "standard" | "direct";
+  limit: number;
+  endpoint: "search" | "generate-doc";
+  fromDate?: string;
+  toDate?: string;
+};
+type BackendRagPayload = {
+  query_text: string;
+  repo_id: string;
+  limit: number;
+  type: "standard" | "direct";
+  from_date?: string;
+  to_date?: string;
+};
 
 function Workspace() {
   const { productId } = Route.useParams();
@@ -89,12 +106,15 @@ function Workspace() {
   const [team, setTeam] = useState<string>("");
   const [component, setComponent] = useState<ComponentName | "">("");
   const [limit, setLimit] = useState(15);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [aiText, setAiText] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string>("");
   const [docNeeded, setDocNeeded] = useState(false);
+  
   const ragSearch = useServerFn(runRagSearch);
 
   const handleSearch = async () => {
@@ -112,18 +132,33 @@ function Workspace() {
     setAiLoading(true);
     setAiError("");
     setAiText("");
+    const timeframe = mode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
+    const requestPayload = {
+      queryText: query.trim(),
+      repoId: REPO_ID_BY_COMPONENT[component],
+      type: mode,
+      limit,
+      endpoint: docNeeded ? "generate-doc" : "search",
+      ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
+      // unique value to avoid client-side/server-side caching of identical payloads
+      bustCache: Date.now(),
+    } as const;
+    const finalPayload = toBackendPayload(requestPayload);
+
+    console.info("[RAG UI final payload]", finalPayload);
+    console.info("[RAG UI curl equivalent]", buildCurlEquivalent(finalPayload, requestPayload.endpoint));
+
     try {
-      const data = await ragSearch({
-        data: {
-          queryText: query.trim(),
-          repoId: REPO_ID_BY_COMPONENT[component],
-          type: mode,
-          limit,
-          endpoint: docNeeded ? "generate-doc" : "search",
-        },
+      const data = await ragSearch({ data: requestPayload });
+
+      console.info("[RAG UI raw server-fn response]", data);
+      console.info("[RAG UI render source]", {
+        rendersField: docNeeded ? "full generate-doc response" : "answer",
+        rawLlmResponse: docNeeded ? data : data.answer,
       });
 
-      setAiText(normalizeRagAnswer(docNeeded ? data : data.answer));
+      const answer = docNeeded ? normalizeRagAnswer(data) : rawAnswerText(data.answer);
+      setAiText(answer);
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "Failed to fetch RAG API response");
     } finally {
@@ -200,8 +235,8 @@ function Workspace() {
               </ToggleGroupItem>
             </ToggleGroup>
 
-            <Select value={team} onValueChange={setTeam} disabled>
-              <SelectTrigger className="h-10 w-[130px] opacity-50">
+            <Select value={team} onValueChange={setTeam}>
+              <SelectTrigger className="h-10 w-[130px]">
                 <SelectValue placeholder="Team" />
               </SelectTrigger>
               <SelectContent>
@@ -242,6 +277,17 @@ function Workspace() {
               </SelectContent>
             </Select>
 
+            {mode === "standard" && (
+              <TimeframePicker
+                fromDate={fromDate}
+                toDate={toDate}
+                onChange={(nextFromDate, nextToDate) => {
+                  setFromDate(nextFromDate);
+                  setToDate(nextToDate);
+                }}
+              />
+            )}
+
             <Button
               aria-label="Search"
               onClick={handleSearch}
@@ -255,7 +301,14 @@ function Workspace() {
               )}
             </Button>
           </div>
+              
         </div>
+        {mode === "standard" && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Time frame applies to Standard searches. If no dates are selected, the default
+            search window is the last 30 days.
+          </p>
+        )}
 
         {/* Results */}
         <section className="mt-6">
@@ -316,6 +369,8 @@ function Workspace() {
         component={component}
         mode={mode}
         limit={limit}
+        fromDate={fromDate}
+        toDate={toDate}
       />
     </div>
   );
@@ -734,6 +789,112 @@ function stripMarkdown(value: string) {
   return value.replace(/\*\*/g, "").replace(/`/g, "");
 }
 
+function getStandardTimeframe(fromDate: string, toDate: string) {
+  if (fromDate && toDate) return { fromDate, toDate };
+  return null;
+}
+
+function toBackendPayload(request: UiRagRequest): BackendRagPayload {
+  return {
+    query_text: request.queryText,
+    repo_id: request.repoId,
+    limit: request.limit,
+    type: request.type,
+    ...(request.type === "standard" && request.fromDate && request.toDate
+      ? { from_date: request.fromDate, to_date: request.toDate }
+      : {}),
+  };
+}
+
+function buildCurlEquivalent(payload: BackendRagPayload, endpoint: UiRagRequest["endpoint"]) {
+  const path = endpoint === "generate-doc" ? "/api/v1/rag-go/generate-doc" : "/api/v1/rag-go";
+  return [
+    `curl -X POST "http://infer.hawk-llm.ai${path}" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -d '${JSON.stringify(payload, null, 2)}'`,
+  ].join("\n");
+}
+
+function TimeframePicker({
+  fromDate,
+  toDate,
+  onChange,
+}: {
+  fromDate: string;
+  toDate: string;
+  onChange: (fromDate: string, toDate: string) => void;
+}) {
+  const selectedFrom = parseDateValue(fromDate);
+  const selectedTo = parseDateValue(toDate);
+  const label =
+    fromDate && toDate ? `${formatDateLabel(fromDate)} - ${formatDateLabel(toDate)}` : "Timeframe";
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 w-[168px] justify-start gap-2 px-3 font-normal"
+        >
+          <CalendarIcon className="h-4 w-4" />
+          <span className="truncate">{label}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-3">
+        <Calendar
+          mode="range"
+          numberOfMonths={2}
+          selected={
+            selectedFrom || selectedTo
+              ? {
+                  from: selectedFrom,
+                  to: selectedTo,
+                }
+              : undefined
+          }
+          onSelect={(range) => {
+            onChange(
+              range?.from ? toDateValue(range.from) : "",
+              range?.to ? toDateValue(range.to) : "",
+            );
+          }}
+        />
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">
+            {fromDate && toDate ? `${fromDate} to ${toDate}` : "Select from and to dates"}
+          </p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange("", "")}>
+            Clear
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function parseDateValue(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+}
+
+function toDateValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateLabel(value: string) {
+  const date = parseDateValue(value);
+  if (!date) return value;
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function UnsupportedProduct({ productName }: { productName?: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
@@ -784,6 +945,8 @@ function GenerateDocumentDialog({
   component,
   mode,
   limit,
+  fromDate = "",
+  toDate = "",
   providedMarkdown,
   providedTitle,
 }: {
@@ -795,6 +958,8 @@ function GenerateDocumentDialog({
   component: ComponentName | "";
   mode: "standard" | "direct";
   limit: number;
+  fromDate?: string;
+  toDate?: string;
   providedMarkdown?: string;
   providedTitle?: string;
 }) {
@@ -845,16 +1010,26 @@ function GenerateDocumentDialog({
     setDocError("");
 
     try {
+      const timeframe = mode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
+      const requestPayload = {
+        queryText: query.trim(),
+        repoId: REPO_ID_BY_COMPONENT[component],
+        type: mode,
+        limit,
+        endpoint: "generate-doc",
+        ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
+        // bust cache to force fresh server-fn invocation
+        bustCache: Date.now(),
+      } as const;
+      const finalPayload = toBackendPayload(requestPayload);
+      console.info("[RAG UI document final payload]", finalPayload);
+      console.info("[RAG UI document curl equivalent]", buildCurlEquivalent(finalPayload, "generate-doc"));
+
       const data = await ragSearch({
-        data: {
-          queryText: query.trim(),
-          repoId: REPO_ID_BY_COMPONENT[component],
-          type: mode,
-          limit,
-          endpoint: "generate-doc",
-        },
+        data: requestPayload,
       });
 
+      console.info("[RAG UI raw generate-doc response]", data);
       const generatedAnswer = normalizeRagAnswer(data);
       const generatedDoc = parseDocDecisionResponse(generatedAnswer);
       const markdown = addTitleToMarkdown(resolvedTitle, generatedDoc.markdown || generatedAnswer);
@@ -941,6 +1116,10 @@ function addTitleToMarkdown(title: string, markdown: string) {
 function normalizeRagAnswer(answer: unknown) {
   if (typeof answer === "string") return answer;
   return JSON.stringify(answer ?? "", null, 2);
+}
+
+function rawAnswerText(answer: unknown) {
+  return typeof answer === "string" ? answer : normalizeRagAnswer(answer);
 }
 
 function parseDocDecisionResponse(value: string, repoId = ""): DocDecisionResponse {
@@ -1130,11 +1309,12 @@ function arrayOfStrings(value: unknown) {
 }
 
 function downloadMarkdownDocument(title: string, markdown: string) {
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  const html = buildFormattedDocumentHtml(title, markdown);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${slugify(title)}.md`;
+  anchor.download = `${slugify(title)}.html`;
   anchor.click();
   URL.revokeObjectURL(url);
 }

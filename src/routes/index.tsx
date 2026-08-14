@@ -6,17 +6,17 @@ import { SiteHeader } from "@/components/SiteHeader";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Doc Changes Tracker — Product Documentation Updates" },
+      { title: "AI Documentation Intelligence — Product Knowledge Workspace" },
       {
         name: "description",
         content:
-          "Subscribe to documentation changes across products. Stay informed about new features, breaking changes, and updates.",
+          "Ask AI-powered questions across product documentation, repositories, code changes, and generated technical content.",
       },
-      { property: "og:title", content: "Doc Changes Tracker" },
+      { property: "og:title", content: "AI Documentation Intelligence" },
       {
         property: "og:description",
         content:
-          "Subscribe to documentation changes across products and stay informed about new features and breaking changes.",
+          "Explore product knowledge, summarize changes, and generate documentation from repository-aware AI answers.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

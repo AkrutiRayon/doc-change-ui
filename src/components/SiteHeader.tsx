@@ -28,12 +28,12 @@ export function SiteHeader() {
         <div>
           <Link to="/" className="inline-block">
             <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-              Doc Changes Tracker
+              AI Documentation Intelligence
             </h1>
           </Link>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Subscribe to documentation changes across products. Stay informed
-            about new features, breaking changes, and updates.
+            Choose a product to ask AI-powered questions across documentation,
+            code changes, repositories, and generated release-ready content.
           </p>
         </div>
 
