@@ -422,10 +422,10 @@ function MarkdownAnswer({
     blocks.push(
       <div
         key={`code-${blocks.length}`}
-        className="my-5 overflow-hidden rounded-lg border border-border bg-slate-950 text-slate-100 shadow-sm"
+        className="my-5 overflow-hidden rounded-md border border-slate-200 bg-slate-50 shadow-sm"
       >
         <pre className="overflow-x-auto px-5 py-4 text-[15px] leading-7">
-          <code className="font-mono text-slate-100">
+          <code className="font-mono text-slate-950">
             {renderCodeWithHighlight(codeLines.join("\n"))}
           </code>
         </pre>
