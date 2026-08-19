@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { getProduct } from "@/data/products";
 import { runRagSearch } from "@/lib/rag.functions";
-import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -59,14 +59,34 @@ const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number], string> = {
   MCP: "github.com/Blazemeter/bzm-mcp",
 };
 
-const EXAMPLE_PROMPTS = [
-  "What changed in authentication last month?",
-  "Show API updates for OAuth.",
-  "Summarize documentation updates from Team Titans.",
-  "Generate release notes for Portal changes.",
-];
-
 type ComponentName = (typeof COMPONENTS)[number];
+type ExamplePrompt = {
+  prompt: string;
+  component: ComponentName;
+  mode: "standard" | "direct";
+};
+const EXAMPLE_PROMPTS: ExamplePrompt[] = [
+  {
+    prompt: "What changed in Taurus in the last 30 days?",
+    component: "Taurus",
+    mode: "standard",
+  },
+  {
+    prompt: "How do I configure secrets in k6 in Taurus YAML?",
+    component: "Taurus",
+    mode: "direct",
+  },
+  {
+    prompt: "What changed in the helm-crane Helm chart?",
+    component: "Crane",
+    mode: "standard",
+  },
+  {
+    prompt: "How do I get started with BlazeMeter MCP?",
+    component: "MCP",
+    mode: "direct",
+  },
+];
 type DocDecisionResponse = {
   status: string;
   documentLinks: DocumentLink[];
@@ -116,6 +136,17 @@ function Workspace() {
   const [docNeeded, setDocNeeded] = useState(false);
   
   const ragSearch = useServerFn(runRagSearch);
+
+  const handleDocNeededChange = (checked: boolean) => {
+    setDocNeeded(checked);
+
+    if (!checked) {
+      setHasSearched(false);
+      setAiText("");
+      setAiError("");
+      setAiLoading(false);
+    }
+  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -171,7 +202,7 @@ function Workspace() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
@@ -195,9 +226,9 @@ function Workspace() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6">
+      <main className="relative z-10 mx-auto max-w-7xl px-6 py-6">
         {/* Toolbar */}
-        <div className="rounded-lg border border-border bg-card p-3">
+        <div className="rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[280px] flex-1">
               <Sparkles className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -213,24 +244,26 @@ function Workspace() {
             <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
               <Checkbox
                 checked={docNeeded}
-                onCheckedChange={(checked) => setDocNeeded(Boolean(checked))}
+                onCheckedChange={(checked) => handleDocNeededChange(Boolean(checked))}
                 id="doc-needed"
               />
               <Label htmlFor="doc-needed" className="cursor-pointer text-sm">
-                Doc needed
+                Doc Gen
               </Label>
             </div>
 
             <ToggleGroup
               type="single"
               value={mode}
-              onValueChange={(v) => v && setMode(v as "standard" | "direct")}
-              className="rounded-md border border-border p-0.5"
+              onValueChange={(v) => !docNeeded && v && setMode(v as "standard" | "direct")}
+              className={`rounded-md border border-border p-0.5 ${
+                docNeeded ? "pointer-events-none opacity-50" : ""
+              }`}
             >
-              <ToggleGroupItem value="standard" className="h-9 px-3 text-xs">
+              <ToggleGroupItem value="standard" className="h-9 px-3 text-xs" disabled={docNeeded}>
                 Standard
               </ToggleGroupItem>
-              <ToggleGroupItem value="direct" className="h-9 px-3 text-xs">
+              <ToggleGroupItem value="direct" className="h-9 px-3 text-xs" disabled={docNeeded}>
                 Direct
               </ToggleGroupItem>
             </ToggleGroup>
@@ -281,6 +314,7 @@ function Workspace() {
               <TimeframePicker
                 fromDate={fromDate}
                 toDate={toDate}
+                disabled={docNeeded}
                 onChange={(nextFromDate, nextToDate) => {
                   setFromDate(nextFromDate);
                   setToDate(nextToDate);
@@ -291,13 +325,13 @@ function Workspace() {
             <Button
               aria-label="Search"
               onClick={handleSearch}
-              className="h-10 w-10 p-0"
+              className="h-10 w-12 rounded-lg border border-slate-200 bg-white p-0 text-slate-950 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
               disabled={aiLoading}
             >
               {aiLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <OrcaMark className="h-6 w-8 animate-pulse" />
               ) : (
-                <Search className="h-4 w-4" />
+                <OrcaMark className="h-6 w-8" />
               )}
             </Button>
           </div>
@@ -313,7 +347,16 @@ function Workspace() {
         {/* Results */}
         <section className="mt-6">
           {!hasSearched ? (
-            <EmptyState onPick={(p) => setQuery(p)} />
+            <EmptyState
+              onPick={(example) => {
+                setQuery(example.prompt);
+                setComponent(example.component);
+                setMode(example.mode);
+                setHasSearched(false);
+                setAiText("");
+                setAiError("");
+              }}
+            />
           ) : (
             <>
               <div className="mb-4">
@@ -334,7 +377,9 @@ function Workspace() {
                 <div className="mt-2">
                   {aiLoading ? (
                     <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="inline-flex h-8 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 shadow-sm">
+                        <OrcaMark className="h-5 w-7 animate-pulse" />
+                      </span>
                       Generating {mode === "standard" ? "release summary" : "answer"}…
                     </p>
                   ) : aiError ? (
@@ -348,7 +393,7 @@ function Workspace() {
                         repoId={component ? REPO_ID_BY_COMPONENT[component] : ""}
                       />
                     ) : (
-                      <MarkdownAnswer markdown={aiText} />
+                      <MarkdownAnswer markdown={getDisplayMarkdown(aiText)} />
                     )
                   ) : (
                     <p className="text-sm text-muted-foreground">No response yet.</p>
@@ -628,7 +673,7 @@ function DocDecisionResult({
         }
       >
         {canDownload ? (
-          <MarkdownAnswer markdown={decision.markdown} showToc={false} framed={false} />
+          <MarkdownAnswer markdown={decision.markdown} showToc framed={false} />
         ) : (
           <p className="text-sm text-muted-foreground">No markdown content provided.</p>
         )}
@@ -818,10 +863,12 @@ function buildCurlEquivalent(payload: BackendRagPayload, endpoint: UiRagRequest[
 function TimeframePicker({
   fromDate,
   toDate,
+  disabled = false,
   onChange,
 }: {
   fromDate: string;
   toDate: string;
+  disabled?: boolean;
   onChange: (fromDate: string, toDate: string) => void;
 }) {
   const selectedFrom = parseDateValue(fromDate);
@@ -835,7 +882,8 @@ function TimeframePicker({
         <Button
           type="button"
           variant="outline"
-          className="h-10 w-[168px] justify-start gap-2 px-3 font-normal"
+          disabled={disabled}
+          className="h-10 w-[168px] justify-start gap-2 px-3 font-normal disabled:opacity-50"
         >
           <CalendarIcon className="h-4 w-4" />
           <span className="truncate">{label}</span>
@@ -913,22 +961,82 @@ function UnsupportedProduct({ productName }: { productName?: string }) {
   );
 }
 
-function EmptyState({ onPick }: { onPick: (p: string) => void }) {
+function OrcaMark({ className }: { className?: string }) {
   return (
-    <div className="mx-auto mt-16 max-w-2xl text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-        <Sparkles className="h-5 w-5 text-muted-foreground" />
+    <svg
+      viewBox="0 0 96 58"
+      className={className}
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M14 43c13-18 32-29 52-28 11 1 17 6 18 12-6-3-13-4-21-2-12 2-24 10-34 22-6 1-11 0-15-4Z"
+        fill="currentColor"
+        opacity="0.12"
+      />
+      <path
+        d="M15 43c11-17 29-28 49-28 12 0 20 5 21 12-11-5-27-1-40 9-6 5-11 10-15 15-6 0-11-3-15-8Z"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M38 21c-7-10-15-13-24-12 7 4 12 11 14 21"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M52 35c6 5 12 7 21 6-7 6-15 8-26 5"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 42c-5 2-9 6-12 11 7-1 14-4 20-10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M55 24c-5 0-10 2-14 5 6 2 13 2 19-2"
+        fill="currentColor"
+        opacity="0.22"
+      />
+      <path d="M76 18h.01" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+      <path
+        d="M84 7v8M80 11h8M90 22v6M87 25h6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function EmptyState({ onPick }: { onPick: (example: ExamplePrompt) => void }) {
+  return (
+    <div className="relative mx-auto mt-16 max-w-2xl text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm">
+        <OrcaMark className="h-6 w-8" />
       </div>
       <h2 className="text-lg font-semibold">Ask AI about your code and docs</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Try one of these prompts to get started</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Try a BlazeMeter component prompt to get started
+      </p>
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
-        {EXAMPLE_PROMPTS.map((p) => (
+        {EXAMPLE_PROMPTS.map((example) => (
           <button
-            key={p}
-            onClick={() => onPick(p)}
+            key={example.prompt}
+            onClick={() => onPick(example)}
             className="rounded-lg border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:border-foreground/20 hover:bg-accent"
           >
-            {p}
+            {example.prompt}
           </button>
         ))}
       </div>
@@ -1120,6 +1228,11 @@ function normalizeRagAnswer(answer: unknown) {
 
 function rawAnswerText(answer: unknown) {
   return typeof answer === "string" ? answer : normalizeRagAnswer(answer);
+}
+
+function getDisplayMarkdown(value: string) {
+  const decision = parseDocDecisionResponse(value);
+  return decision.status || decision.markdown ? decision.markdown || value : value;
 }
 
 function parseDocDecisionResponse(value: string, repoId = ""): DocDecisionResponse {
