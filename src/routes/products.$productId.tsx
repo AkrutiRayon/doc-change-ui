@@ -325,13 +325,19 @@ function Workspace() {
             <Button
               aria-label="Search"
               onClick={handleSearch}
-              className="h-10 w-12 rounded-lg border border-slate-200 bg-white p-0 text-slate-950 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
               disabled={aiLoading}
+              className="h-10 gap-2 rounded-lg bg-primary px-5 font-medium text-primary-foreground shadow-md shadow-primary/25 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0"
             >
               {aiLoading ? (
-                <OrcaMark className="h-6 w-8 animate-pulse" />
+                <>
+                  <Sparkles className="h-4 w-4 animate-pulse" />
+                  Search
+                </>
               ) : (
-                <OrcaMark className="h-6 w-8" />
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Search
+                </>
               )}
             </Button>
           </div>
