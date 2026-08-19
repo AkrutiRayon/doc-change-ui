@@ -326,17 +326,17 @@ function Workspace() {
               aria-label="Search"
               onClick={handleSearch}
               disabled={aiLoading}
-              className="h-10 gap-2 rounded-lg bg-primary px-5 font-medium text-primary-foreground shadow-md shadow-primary/25 transition-all hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0"
+              className="h-10 gap-2 rounded-lg bg-muted px-5 font-medium text-foreground shadow-md shadow-black/10 transition-all hover:-translate-y-0.5 hover:bg-black hover:text-white hover:shadow-lg hover:shadow-black/20 active:translate-y-0 active:bg-black"
             >
               {aiLoading ? (
                 <>
-                  <Sparkles className="h-4 w-4 animate-pulse" />
                   Search
+                  <Sparkles className="h-4 w-4 animate-pulse" />
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" />
                   Search
+                  <Sparkles className="h-4 w-4" />
                 </>
               )}
             </Button>
