@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const RAG_BASE_HOST = process.env.RAG_BASE_HOST ?? "infer.hawk-llm.ai";
+const RAG_BASE_HOST = process.env['RAG_BASE_HOST'] ?? "infer.hawk-llm.ai";
 const RAG_BASE_URL = `http://${RAG_BASE_HOST.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
 const RAG_PATH = "/api/v1/rag-go";
 
@@ -48,7 +48,7 @@ export const runRagSearch = createServerFn({ method: "POST" })
     };
     const body = JSON.stringify(payload);
 
-    const ENABLE_RAG_CACHE = (process.env.ENABLE_RAG_CACHE || "false").toLowerCase() === "true";
+    const ENABLE_RAG_CACHE = (process.env['ENABLE_RAG_CACHE'] || "false").toLowerCase() === "true";
     const cacheStatus = ENABLE_RAG_CACHE ? "enabled" : "disabled";
 
     // generate a request UUID and timestamp for diagnostics
@@ -98,7 +98,7 @@ export const runRagSearch = createServerFn({ method: "POST" })
       throw new Error(`RAG API error ${response.status}: ${text}`);
     }
 
-    const json = (await response.json()) as RagResponse & Record<string, unknown>;
+    const json = (await response.json()) as any;
 
     // determine cache hit/miss if backend exposes it
     const backendCacheIndicator = pickFirstPresent(json, ["cache_status", "cacheStatus", "cache"]);
@@ -143,15 +143,15 @@ export const runRagSearch = createServerFn({ method: "POST" })
         "generation_config",
         "generationConfig",
       ]),
-      rawLlmResponse: json.answer ?? json,
+      rawLlmResponse: json['answer'] ?? json,
       diagnosticsAvailability:
         "If any field above is undefined, /api/v1/rag-go did not return it to this UI.",
     });
 
     // attach diagnostics for UI consumption
     try {
-      if (!json.debug || typeof json.debug !== "object") json.debug = {};
-      (json.debug as Record<string, unknown>)._ui = {
+      if (!json['debug'] || typeof json['debug'] !== "object") json['debug'] = {};
+      (json['debug'] as Record<string, unknown>)['_ui'] = {
         requestUuid,
         backendRequestTimestamp,
         cacheStatus: cacheIndicator,
@@ -160,20 +160,20 @@ export const runRagSearch = createServerFn({ method: "POST" })
       // ignore
     }
 
-    return json;
+    return json as any;
   });
 
-function pickFirstPresent(record: Record<string, unknown>, keys: string[]) {
+function pickFirstPresent(record: any, keys: string[]) {
   for (const key of keys) {
     if (record[key] !== undefined) return record[key];
   }
 
-  const debug = record.debug;
+  const debug = record['debug'];
   if (debug && typeof debug === "object" && !Array.isArray(debug)) {
     return pickFirstPresent(debug as Record<string, unknown>, keys);
   }
 
-  const meta = record.meta;
+  const meta = record['meta'];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     return pickFirstPresent(meta as Record<string, unknown>, keys);
   }

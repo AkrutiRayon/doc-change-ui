@@ -514,8 +514,8 @@ function MarkdownAnswer({
     const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
     if (heading) {
       flushList();
-      const level = heading[1].length;
-      const headingText = heading[2];
+      const level = heading[1]!.length;
+      const headingText = heading[2]!;
       const headingId = `${slugifyHeading(headingText)}-${headings.length}`;
       headings.push({ id: headingId, text: stripMarkdown(headingText), level });
       const content = renderInlineMarkdown(headingText);
@@ -556,14 +556,14 @@ function MarkdownAnswer({
     const bullet = trimmed.match(/^[-*]\s+(.+)$/);
     if (bullet) {
       orderedItems = [];
-      listItems.push(bullet[1]);
+      listItems.push(bullet[1]!);
       return;
     }
 
     const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
     if (numbered) {
       listItems = [];
-      orderedItems.push(numbered[1]);
+      orderedItems.push(numbered[1]!);
       return;
     }
 
@@ -949,7 +949,7 @@ function formatDateLabel(value: string) {
   });
 }
 
-function UnsupportedProduct({ productName }: { productName?: string }) {
+function UnsupportedProduct({ productName }: { productName?: string | undefined }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
       <div className="max-w-md text-center">
@@ -1245,7 +1245,7 @@ function parseDocDecisionResponse(value: string, repoId = ""): DocDecisionRespon
   const parsed = parseJsonLike(value);
 
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-    const record = parsed as Record<string, unknown>;
+    const record = parsed as any;
     const markdownField = findDocMarkdownField(record);
 
     if (!markdownField.markdown && record.answer !== undefined) {
@@ -1274,7 +1274,7 @@ function shouldShowDocumentLinks(status: string) {
   return status === "update_required" || status === "no_changes_required";
 }
 
-function findDocumentLinks(record: Record<string, unknown>, repoId: string): DocumentLink[] {
+function findDocumentLinks(record: any, repoId: string): DocumentLink[] {
   const docs = [
     ...arrayOfObjects(record.matched_docs),
     ...arrayOfObjects(record.matchedDocs),
@@ -1310,7 +1310,7 @@ function findDocumentLinks(record: Record<string, unknown>, repoId: string): Doc
       const label = stringValue(doc.title) || docRef || href;
 
       if (!label) return null;
-      return { label, href: href || undefined };
+      return href ? { label, href } : { label };
     })
     .filter(Boolean) as DocumentLink[];
 
@@ -1342,7 +1342,7 @@ function buildRepoDocumentHref(repoId: string, docRef: string) {
   return `https://${normalizedRepo}/blob/HEAD/${encodeURI(normalizedDocRef)}`;
 }
 
-function findDocMarkdownField(record: Record<string, unknown>): {
+function findDocMarkdownField(record: any): {
   label: "changes_markdown" | "body_markdown";
   markdown: string;
 } {
@@ -1351,7 +1351,7 @@ function findDocMarkdownField(record: Record<string, unknown>): {
     objectValue(record.delta),
     objectValue(record.document),
     objectValue(record.result),
-  ].filter(Boolean) as Record<string, unknown>[];
+  ].filter(Boolean) as any[];
 
   for (const container of containers) {
     const changesMarkdown =
@@ -1378,7 +1378,7 @@ function parseJsonLike(value: string): unknown {
     if (!fenced) return null;
 
     try {
-      return JSON.parse(fenced[1]);
+      return JSON.parse(fenced[1] ?? "");
     } catch {
       return null;
     }
@@ -1391,7 +1391,7 @@ function stringValue(value: unknown) {
 
 function objectValue(value: unknown) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
+    return value as any;
   }
 
   return null;
@@ -1400,9 +1400,9 @@ function objectValue(value: unknown) {
 function arrayOfObjects(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.filter(
-    (item): item is Record<string, unknown> =>
+    (item): item is any =>
       Boolean(item) && typeof item === "object" && !Array.isArray(item),
-  );
+  ) as any[];
 }
 
 function dedupeDocumentLinks(links: DocumentLink[]) {
@@ -1668,8 +1668,8 @@ function parseMarkdownForDocument(markdown: string) {
     const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
     if (heading) {
       flushList();
-      const level = heading[1].length;
-      const headingText = heading[2];
+      const level = heading[1]!.length;
+      const headingText = heading[2]!;
       const id = `${slugifyHeading(headingText)}-${headings.length}`;
       headings.push({ id, text: stripMarkdown(headingText), level });
       body.push(`<h${level} id="${id}">${renderInlineMarkdownHtml(headingText)}</h${level}>`);
@@ -1679,14 +1679,14 @@ function parseMarkdownForDocument(markdown: string) {
     const bullet = trimmed.match(/^[-*]\s+(.+)$/);
     if (bullet) {
       orderedItems = [];
-      listItems.push(bullet[1]);
+      listItems.push(bullet[1]!);
       return;
     }
 
     const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
     if (numbered) {
       listItems = [];
-      orderedItems.push(numbered[1]);
+      orderedItems.push(numbered[1]!);
       return;
     }
 
