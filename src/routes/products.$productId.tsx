@@ -1316,14 +1316,10 @@ function findDocumentLinks(record: any, repoId: string): DocumentLink[] {
 
   if (links.length > 0) return dedupeDocumentLinks(links);
 
-  return targetDocRef
-    ? [
-        {
-          label: targetDocRef,
-          href: buildRepoDocumentHref(repoId, targetDocRef),
-        },
-      ]
-    : [];
+  if (!targetDocRef) return [];
+  const targetHref = buildRepoDocumentHref(repoId, targetDocRef);
+  return [targetHref ? { label: targetDocRef, href: targetHref } : { label: targetDocRef }];
+
 }
 
 function normalizeDocumentHref(href: string) {
