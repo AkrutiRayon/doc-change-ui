@@ -1,0 +1,12 @@
+.git
+.lovable
+.vscode
+node_modules
+.output
+dist
+dist-ssr
+.vinxi
+.tanstack
+.nitro
+*.log
+.DS_Store
