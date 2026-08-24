@@ -2,6 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { getProduct } from "@/data/products";
+import orcLogo from "@/assets/logos/orc.png";
 import { runRagSearch } from "@/lib/rag.functions";
 import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -383,8 +384,13 @@ function Workspace() {
                 <div className="mt-2">
                   {aiLoading ? (
                     <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="inline-flex h-8 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-950 shadow-sm">
-                        <OrcaMark className="h-5 w-7 animate-pulse" />
+                      <span className="inline-flex h-12 w-16 items-center justify-center">
+                        <img
+                          src={orcLogo}
+                          alt=""
+                          aria-hidden="true"
+                          className="h-12 w-16 object-contain logo-float"
+                        />
                       </span>
                       Generating {mode === "standard" ? "release summary" : "answer"}…
                     </p>
@@ -967,69 +973,11 @@ function UnsupportedProduct({ productName }: { productName?: string | undefined 
   );
 }
 
-function OrcaMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 96 58"
-      className={className}
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M14 43c13-18 32-29 52-28 11 1 17 6 18 12-6-3-13-4-21-2-12 2-24 10-34 22-6 1-11 0-15-4Z"
-        fill="currentColor"
-        opacity="0.12"
-      />
-      <path
-        d="M15 43c11-17 29-28 49-28 12 0 20 5 21 12-11-5-27-1-40 9-6 5-11 10-15 15-6 0-11-3-15-8Z"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M38 21c-7-10-15-13-24-12 7 4 12 11 14 21"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M52 35c6 5 12 7 21 6-7 6-15 8-26 5"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M21 42c-5 2-9 6-12 11 7-1 14-4 20-10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M55 24c-5 0-10 2-14 5 6 2 13 2 19-2"
-        fill="currentColor"
-        opacity="0.22"
-      />
-      <path d="M76 18h.01" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-      <path
-        d="M84 7v8M80 11h8M90 22v6M87 25h6"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function EmptyState({ onPick }: { onPick: (example: ExamplePrompt) => void }) {
   return (
     <div className="relative mx-auto mt-16 max-w-2xl text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm">
-        <OrcaMark className="h-6 w-8" />
+      <div className="mx-auto mb-4 flex h-24 w-32 items-center justify-center">
+        <img src={orcLogo} alt="" aria-hidden="true" className="h-24 w-32 object-contain" />
       </div>
       <h2 className="text-lg font-semibold">Ask AI about your code and docs</h2>
       <p className="mt-1 text-sm text-muted-foreground">
