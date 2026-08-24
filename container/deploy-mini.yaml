@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mini-ui
+  name: mini-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mini-ui
+  template:
+    metadata:
+      labels:
+        app: mini-ui
+    spec:
+      containers:
+      - image: immnan/mini-ui:0.1.0
+        name: mini-ui
+        ports:
+        - containerPort: 3000
+          name: http
+---

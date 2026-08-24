@@ -1,9 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const RAG_BASE_HOST = process.env['RAG_BASE_HOST'] ?? "infer.hawk-llm.ai";
-const RAG_BASE_URL = `http://${RAG_BASE_HOST.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+const configuredRagBaseUrl =
+  process.env["RAG_BASE_URL"]?.trim() || process.env["RAG_BASE_HOST"]?.trim();
+const RAG_BASE_URL = normalizeRagBaseUrl(configuredRagBaseUrl || "http://infer.hawk-llm.ai");
 const RAG_PATH = "/api/v1/rag-go";
+
+function normalizeRagBaseUrl(value: string) {
+  const withProtocol = /^https?:\/\//i.test(value) ? value : `http://${value}`;
+  return withProtocol.replace(/\/+$/, "");
+}
 
 const InputSchema = z.object({
   queryText: z.string().min(1),
