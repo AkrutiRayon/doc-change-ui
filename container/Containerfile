@@ -20,7 +20,7 @@ ENV NODE_ENV=production \
 	PORT=3000 \
 	RAG_BASE_URL=http://infer.hawk-llm.ai
 
-COPY --from=build --link --chown=node:node /app/.output/ ./
+COPY --from=build --chown=node:node /app/.output/ ./
 
 USER node
 
