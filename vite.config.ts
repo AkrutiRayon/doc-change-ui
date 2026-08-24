@@ -11,6 +11,7 @@ export default defineConfig({
     preset: "node-server",
   },
   vite: {
+    base: "/ui/",
     server: {
       host: "localhost",
       port: 8080,
