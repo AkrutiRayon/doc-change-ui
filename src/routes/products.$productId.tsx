@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getProduct } from "@/data/products";
 import orcLogo from "@/assets/logos/orc.png";
 import { runRagSearch } from "@/lib/rag.functions";
