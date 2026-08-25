@@ -229,15 +229,15 @@ function Workspace() {
       <main className="relative z-10 mx-auto max-w-7xl px-6 py-6">
         {/* Toolbar */}
         <div className="rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur">
-          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
-            <div className="relative min-w-[280px] flex-1">
-              <Sparkles className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-white/60" />
+          <div className="flex flex-nowrap items-center gap-2 overflow-x-hidden">
+            <div className="relative min-w-[360px] flex-[1_1_360px]">
+              <Sparkles className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 type="text"
                 placeholder="Ask anything about documentation or source code changes..."
-                className="h-10 w-full min-w-0 rounded-md border border-border bg-white py-2.5 pl-9 pr-3 text-sm text-black placeholder:text-muted-foreground outline-none focus-visible:border-foreground focus-visible:ring-2 focus-visible:ring-ring/20"
+                className="h-10 w-full min-w-0 rounded-md border border-border bg-white py-2.5 pl-9 pr-3 text-[13px] text-black placeholder:text-muted-foreground outline-none focus-visible:border-foreground focus-visible:ring-2 focus-visible:ring-ring/20"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
