@@ -137,6 +137,14 @@ function Workspace() {
   const [docNeeded, setDocNeeded] = useState(false);
   
   const ragSearch = useServerFn(runRagSearch);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [query]);
 
   const handleDocNeededChange = (checked: boolean) => {
     setDocNeeded(checked);
