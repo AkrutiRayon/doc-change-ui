@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getProduct } from "@/data/products";
 import orcLogo from "@/assets/logos/orc.png";
 import { runRagSearch } from "@/lib/rag.functions";
@@ -137,6 +137,14 @@ function Workspace() {
   const [docNeeded, setDocNeeded] = useState(false);
   
   const ragSearch = useServerFn(runRagSearch);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [query]);
 
   const handleDocNeededChange = (checked: boolean) => {
     setDocNeeded(checked);
@@ -230,15 +238,22 @@ function Workspace() {
       <main className="relative z-10 mx-auto max-w-7xl px-6 py-6">
         {/* Toolbar */}
         <div className="rounded-lg border border-border bg-card/95 p-3 shadow-sm backdrop-blur">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-2">
             <div className="relative min-w-[280px] flex-1">
-              <Sparkles className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <Sparkles className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-white/60" />
+              <textarea
+                ref={textareaRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Ask anything about documentation or source code changes..."
-                className="pl-9 h-10"
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                rows={1}
+                className="w-full resize-none rounded-md border border-white/10 bg-black py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-white/60 outline-none ring-offset-0 focus-visible:border-white/30 focus-visible:ring-2 focus-visible:ring-white/20 min-h-10 max-h-60 overflow-y-auto"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
               />
             </div>
 
