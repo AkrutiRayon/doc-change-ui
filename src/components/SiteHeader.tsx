@@ -27,13 +27,10 @@ export function SiteHeader() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10 md:flex-row md:items-center md:justify-between">
         <div>
           <Link to="/" className="inline-block">
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-              AI Documentation Intelligence
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">ORCA</h1>
           </Link>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Choose a product to ask AI-powered questions across documentation,
-            code changes, repositories, and generated release-ready content.
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground/80 md:text-sm">
+            — from the source
           </p>
         </div>
 
