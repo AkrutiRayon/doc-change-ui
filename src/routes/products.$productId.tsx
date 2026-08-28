@@ -51,13 +51,14 @@ export const Route = createFileRoute("/products/$productId")({
   component: Workspace,
 });
 
-const COMPONENTS = ["Taurus", "Crane", "MCP"] as const;
+const COMPONENTS = ["Taurus", "Helm-crane", "BZM-MCP", "SV-MCP"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const LIMITS = [10, 15, 20, 25, 30, 35, 40, 45, 50];
 const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number], string> = {
   Taurus: "github.com/Blazemeter/taurus",
-  Crane: "github.com/Blazemeter/helm-crane",
-  MCP: "github.com/Blazemeter/bzm-mcp",
+  "Helm-crane": "github.com/Blazemeter/helm-crane",
+  "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
+  "SV-MCP": "github.com/Blazemeter/sv-mcp",
 };
 
 type ComponentName = (typeof COMPONENTS)[number];
@@ -78,13 +79,13 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
     mode: "direct",
   },
   {
-    prompt: "What changed in the helm-crane Helm chart?",
-    component: "Crane",
+    prompt: "What changed in the Helm-crane Helm chart?",
+    component: "Helm-crane",
     mode: "standard",
   },
   {
     prompt: "How do I get started with BlazeMeter MCP?",
-    component: "MCP",
+    component: "BZM-MCP",
     mode: "direct",
   },
 ];
