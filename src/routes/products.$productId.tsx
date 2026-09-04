@@ -34,13 +34,13 @@ import { Separator } from "@/components/ui/separator";
 export const Route = createFileRoute("/products/$productId")({
   head: () => ({
     meta: [
-      { title: "Product Workspace — AI Documentation & Code Search" },
+      { title: "ORCA" },
       {
         name: "description",
         content:
           "Ask AI questions about documentation and source code changes across your teams and components.",
       },
-      { property: "og:title", content: "Product Workspace — AI Documentation & Code Search" },
+      { property: "og:title", content: "ORCA" },
       {
         property: "og:description",
         content:
@@ -51,12 +51,13 @@ export const Route = createFileRoute("/products/$productId")({
   component: Workspace,
 });
 
-const COMPONENTS = ["Taurus", "Helm-crane", "BZM-MCP", "SV-MCP"] as const;
+const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const LIMITS = [10, 15, 20, 25, 30, 35, 40, 45, 50];
 const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number], string> = {
   Taurus: "github.com/Blazemeter/taurus",
   "Helm-crane": "github.com/Blazemeter/helm-crane",
+  Crane: "github.com/Blazemeter/bzm-crane",
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
 };
@@ -770,11 +771,19 @@ function renderInlineMarkdown(text: string) {
 
 function renderCodeWithHighlight(code: string) {
   const tokenPattern =
-    /(\/\/.*|#[^\n]*|\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await|settings|env)\b|"[^"]*"|'[^']*'|`[^`]*`|\b\d+(?:\.\d+)?\b|[A-Z_][A-Z0-9_]*(?=\b)|[A-Za-z_][\w.-]*(?=\s*:)|[A-Za-z_][\w]*(?=\s*\())/g;
+    /(https?:\/\/[^\s"'`]+|\/\/.*|#[^\n]*|\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await|settings|env)\b|"[^"]*"|'[^']*'|`[^`]*`|\b\d+(?:\.\d+)?\b|[A-Z_][A-Z0-9_]*(?=\b)|[A-Za-z_][\w.-]*(?=\s*:)|[A-Za-z_][\w]*(?=\s*\())/g;
   const parts = code.split(tokenPattern);
 
   return parts.map((part, index) => {
     if (!part) return null;
+
+    if (/^https?:\/\//i.test(part)) {
+      return (
+        <span key={index} className="text-blue-700">
+          {part}
+        </span>
+      );
+    }
 
     if (/^(\/\/|#).*/.test(part)) {
       return (
@@ -1671,7 +1680,7 @@ function renderInlineMarkdownHtml(text: string) {
 
 function renderCodeWithHighlightHtml(code: string) {
   const tokenPattern =
-    /(\/\/.*|#[^\n]*|\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await|settings|env)\b|"[^"]*"|'[^']*'|`[^`]*`|\b\d+(?:\.\d)?\b|[A-Z_][A-Z0-9_]*(?=\b)|[A-Za-z_][\w.-]*(?=\s*:)|[A-Za-z_][\w]*(?=\s*\())/g;
+    /(https?:\/\/[^\s"'`]+|\/\/.*|#[^\n]*|\b(?:from|import|as|const|let|var|function|return|export|if|else|for|while|class|def|async|await|settings|env)\b|"[^"]*"|'[^']*'|`[^`]*`|\b\d+(?:\.\d)?\b|[A-Z_][A-Z0-9_]*(?=\b)|[A-Za-z_][\w.-]*(?=\s*:)|[A-Za-z_][\w]*(?=\s*\())/g;
 
   return code
     .split(tokenPattern)
@@ -1679,6 +1688,7 @@ function renderCodeWithHighlightHtml(code: string) {
       if (!part) return "";
       const escaped = escapeHtml(part);
 
+      if (/^https?:\/\//i.test(part)) return `<span class="tok-string">${escaped}</span>`;
       if (/^(\/\/|#).*/.test(part)) return `<span class="tok-comment">${escaped}</span>`;
       if (/^["'`]/.test(part)) return `<span class="tok-string">${escaped}</span>`;
       if (
