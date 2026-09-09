@@ -52,17 +52,19 @@ export const Route = createFileRoute("/products/$productId")({
 });
 
 const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as const;
+const PERFECTO_COMPONENTS = ["Quantum"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const LIMITS = [10, 15, 20, 25, 30, 35, 40, 45, 50];
-const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number], string> = {
+const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number] | (typeof PERFECTO_COMPONENTS)[number], string> = {
   Taurus: "github.com/Blazemeter/taurus",
   "Helm-crane": "github.com/Blazemeter/helm-crane",
   Crane: "github.com/Blazemeter/bzm-crane",
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
+  Quantum: "https://github.com/Perfecto-Quantum/Quantum-Starter-Kit",
 };
 
-type ComponentName = (typeof COMPONENTS)[number];
+type ComponentName = (typeof COMPONENTS)[number] | (typeof PERFECTO_COMPONENTS)[number];
 type ExamplePrompt = {
   prompt: string;
   component: ComponentName;
@@ -122,8 +124,10 @@ type BackendRagPayload = {
 function Workspace() {
   const { productId } = Route.useParams();
   const product = getProduct(productId);
-  const isSupportedProduct = product?.id === "blazemeter";
+  const isSupportedProduct = product?.id === "blazemeter" || product?.id === "perfecto";
   const productName = product?.name ?? "Product";
+  const isPerfecto = product?.id === "perfecto";
+  const activeComponents = isPerfecto ? PERFECTO_COMPONENTS : COMPONENTS;
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<"standard" | "direct">("standard");
   const [team, setTeam] = useState<string>("");
@@ -276,18 +280,20 @@ function Workspace() {
               </ToggleGroupItem>
             </ToggleGroup>
 
-            <Select value={team} onValueChange={setTeam}>
-              <SelectTrigger className="h-10 w-[110px]">
-                <SelectValue placeholder="Team" />
-              </SelectTrigger>
-              <SelectContent>
-                {TEAMS.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!isPerfecto && (
+              <Select value={team} onValueChange={setTeam}>
+                <SelectTrigger className="h-10 w-[110px]">
+                  <SelectValue placeholder="Team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEAMS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             <Select
               value={component}
@@ -297,7 +303,7 @@ function Workspace() {
                 <SelectValue placeholder="Component *" />
               </SelectTrigger>
               <SelectContent>
-                {COMPONENTS.map((c) => (
+                {activeComponents.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>
@@ -361,16 +367,18 @@ function Workspace() {
         {/* Results */}
         <section className="mt-6">
           {!hasSearched ? (
-            <EmptyState
-              onPick={(example) => {
-                setQuery(example.prompt);
-                setComponent(example.component);
-                setMode(example.mode);
-                setHasSearched(false);
-                setAiText("");
-                setAiError("");
-              }}
-            />
+            isPerfecto ? null : (
+              <EmptyState
+                onPick={(example) => {
+                  setQuery(example.prompt);
+                  setComponent(example.component);
+                  setMode(example.mode);
+                  setHasSearched(false);
+                  setAiText("");
+                  setAiError("");
+                }}
+              />
+            )
           ) : (
             <>
               <div className="mb-4">
