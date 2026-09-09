@@ -61,7 +61,7 @@ const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number] | (typeof PERFECT
   Crane: "github.com/Blazemeter/bzm-crane",
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
-  Quantum: "https://github.com/Perfecto-Quantum/Quantum-Starter-Kit",
+  Quantum: "github.com/Perfecto-Quantum/Quantum-Starter-Kit",
 };
 
 type ComponentName = (typeof COMPONENTS)[number] | (typeof PERFECTO_COMPONENTS)[number];
