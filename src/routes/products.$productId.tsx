@@ -53,18 +53,28 @@ export const Route = createFileRoute("/products/$productId")({
 
 const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as const;
 const PERFECTO_COMPONENTS = ["Quantum"] as const;
+const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const LIMITS = [10, 15, 20, 25, 30, 35, 40, 45, 50];
-const REPO_ID_BY_COMPONENT: Record<(typeof COMPONENTS)[number] | (typeof PERFECTO_COMPONENTS)[number], string> = {
+const REPO_ID_BY_COMPONENT: Record<
+  | (typeof COMPONENTS)[number]
+  | (typeof PERFECTO_COMPONENTS)[number]
+  | (typeof P4_COMPONENTS)[number],
+  string
+> = {
   Taurus: "github.com/Blazemeter/taurus",
   "Helm-crane": "github.com/Blazemeter/helm-crane",
   Crane: "github.com/Blazemeter/bzm-crane",
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
   Quantum: "github.com/Perfecto-Quantum/Quantum-Starter-Kit",
+  "p4-mcp": "github.com/perforce/p4mcp-server",
 };
 
-type ComponentName = (typeof COMPONENTS)[number] | (typeof PERFECTO_COMPONENTS)[number];
+type ComponentName =
+  | (typeof COMPONENTS)[number]
+  | (typeof PERFECTO_COMPONENTS)[number]
+  | (typeof P4_COMPONENTS)[number];
 type ExamplePrompt = {
   prompt: string;
   component: ComponentName;
@@ -89,6 +99,16 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
   {
     prompt: "How do I get started with BlazeMeter MCP?",
     component: "BZM-MCP",
+    mode: "direct",
+  },
+  {
+    prompt: "What changed in p4-mcp in the last 30 days?",
+    component: "p4-mcp",
+    mode: "standard",
+  },
+  {
+    prompt: "How do I configure and run the p4 MCP server?",
+    component: "p4-mcp",
     mode: "direct",
   },
 ];
@@ -124,10 +144,12 @@ type BackendRagPayload = {
 function Workspace() {
   const { productId } = Route.useParams();
   const product = getProduct(productId);
-  const isSupportedProduct = product?.id === "blazemeter" || product?.id === "perfecto";
+  const isSupportedProduct =
+    product?.id === "blazemeter" || product?.id === "perfecto" || product?.id === "p4";
   const productName = product?.name ?? "Product";
   const isPerfecto = product?.id === "perfecto";
-  const activeComponents = isPerfecto ? PERFECTO_COMPONENTS : COMPONENTS;
+  const isP4 = product?.id === "p4";
+  const activeComponents = isPerfecto ? PERFECTO_COMPONENTS : isP4 ? P4_COMPONENTS : COMPONENTS;
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<"standard" | "direct">("standard");
   const [team, setTeam] = useState<string>("");
@@ -355,7 +377,6 @@ function Workspace() {
               )}
             </Button>
           </div>
-              
         </div>
         {mode === "standard" && (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -369,6 +390,9 @@ function Workspace() {
           {!hasSearched ? (
             isPerfecto ? null : (
               <EmptyState
+                examples={EXAMPLE_PROMPTS.filter((example) =>
+                  (activeComponents as readonly ComponentName[]).includes(example.component),
+                )}
                 onPick={(example) => {
                   setQuery(example.prompt);
                   setComponent(example.component);
@@ -889,7 +913,7 @@ function toBackendPayload(request: UiRagRequest): BackendRagPayload {
 function buildCurlEquivalent(payload: BackendRagPayload, endpoint: UiRagRequest["endpoint"]) {
   const path = endpoint === "generate-doc" ? "/api/v1/rag-go/generate-doc" : "/api/v1/rag-go";
   return [
-    `curl -X POST "http://infer.hawk-llm.ai${path}" \\`,
+    `curl -X POST "http://orca-infer.ai${path}" \\`,
     `  -H "Content-Type: application/json" \\`,
     `  -d '${JSON.stringify(payload, null, 2)}'`,
   ].join("\n");
@@ -998,18 +1022,22 @@ function UnsupportedProduct({ productName }: { productName?: string | undefined 
   );
 }
 
-function EmptyState({ onPick }: { onPick: (example: ExamplePrompt) => void }) {
+function EmptyState({
+  examples,
+  onPick,
+}: {
+  examples: ExamplePrompt[];
+  onPick: (example: ExamplePrompt) => void;
+}) {
   return (
     <div className="relative mx-auto mt-16 max-w-2xl text-center">
       <div className="mx-auto mb-4 flex h-24 w-32 items-center justify-center">
         <img src={orcLogo} alt="" aria-hidden="true" className="h-24 w-32 object-contain" />
       </div>
       <h2 className="text-lg font-semibold">Ask AI about your code and docs</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Try a BlazeMeter component prompt to get started
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Try a component prompt to get started</p>
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
-        {EXAMPLE_PROMPTS.map((example) => (
+        {examples.map((example) => (
           <button
             key={example.prompt}
             onClick={() => onPick(example)}

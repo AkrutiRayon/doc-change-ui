@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const configuredRagBaseUrl =
   process.env["RAG_BASE_URL"]?.trim() || process.env["RAG_BASE_HOST"]?.trim();
-const RAG_BASE_URL = normalizeRagBaseUrl(configuredRagBaseUrl || "http://infer.hawk-llm.ai");
+const RAG_BASE_URL = normalizeRagBaseUrl(configuredRagBaseUrl || "http://orca-infer.ai");
 const RAG_PATH = "/api/v1/rag-go";
 
 function normalizeRagBaseUrl(value: string) {
@@ -87,11 +87,28 @@ export const runRagSearch = createServerFn({ method: "POST" })
     }
     requestHeaders["X-Request-Id"] = requestUuid;
 
-    const response = await fetch(endpointUrl, {
-      method: "POST",
-      headers: requestHeaders,
-      body,
-    });
+    let response: Response;
+    try {
+      response = await fetch(endpointUrl, {
+        method: "POST",
+        headers: requestHeaders,
+        body,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown fetch failure";
+      console.error("[RAG fetch failed before response]", {
+        endpoint: data.endpoint,
+        url: endpointUrl,
+        payload,
+        requestUuid,
+        durationMs: Date.now() - startedAt,
+        error: message,
+      });
+      throw new Error(
+        `RAG API fetch failed before reaching ${endpointUrl} ` +
+          `(request ${requestUuid}): ${message}`,
+      );
+    }
 
     console.info("[RAG response]", {
       endpoint: data.endpoint,

@@ -83,7 +83,7 @@ function Index() {
               </>
             );
 
-            if (p.id === "blazemeter" || p.id === "perfecto") {
+            if (p.id === "blazemeter" || p.id === "perfecto" || p.id === "p4") {
               return (
                 <Link
                   key={p.id}
