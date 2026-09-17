@@ -55,7 +55,7 @@ const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as con
 const PERFECTO_COMPONENTS = ["Quantum"] as const;
 const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
-const LIMITS = [10, 15, 20, 25, 30, 35, 40, 45, 50];
+const LIMITS = [10, 15, 20, 25];
 const REPO_ID_BY_COMPONENT: Record<
   | (typeof COMPONENTS)[number]
   | (typeof PERFECTO_COMPONENTS)[number]
@@ -196,7 +196,7 @@ function Workspace() {
       queryText: query.trim(),
       repoId: REPO_ID_BY_COMPONENT[component],
       type: mode,
-      limit: limit ?? 15,
+      limit: limit ?? 5,
       endpoint: docNeeded ? "generate-doc" : "search",
       ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
       // unique value to avoid client-side/server-side caching of identical payloads

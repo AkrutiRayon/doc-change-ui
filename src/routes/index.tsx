@@ -6,13 +6,13 @@ import { SiteHeader } from "@/components/SiteHeader";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "AI Documentation Intelligence — Product Knowledge Workspace" },
+      { title: "Orca, AI Powered product Knowledge" },
       {
         name: "description",
         content:
-          "Ask AI-powered questions across product documentation, repositories, code changes, and generated technical content.",
+          "Ask questions across product code to generate and maintain technical content.",
       },
-      { property: "og:title", content: "AI Documentation Intelligence" },
+      { property: "og:title", content: "Orca Product Knowledge" },
       {
         property: "og:description",
         content:
