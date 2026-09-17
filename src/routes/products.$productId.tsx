@@ -464,7 +464,7 @@ function Workspace() {
         aiText={aiText}
         component={component}
         mode={mode}
-        limit={limit ?? 15}
+        limit={limit ?? 5}
         fromDate={fromDate}
         toDate={toDate}
       />
