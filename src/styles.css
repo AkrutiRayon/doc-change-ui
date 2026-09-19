@@ -167,16 +167,16 @@
   animation: logo-float 1.4s ease-in-out infinite;
 }
 
-@keyframes shine {
-  0% {
-    transform: translateX(-100%);
+@keyframes wave-scroll {
+  from {
+    transform: translateX(0);
   }
 
-  100% {
-    transform: translateX(100%);
+  to {
+    transform: translateX(-5%);
   }
 }
 
-.animate-shine {
-  animation: shine 1s linear infinite;
+.animate-wave-scroll {
+  animation: wave-scroll 0.6s linear infinite;
 }
