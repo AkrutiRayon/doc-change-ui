@@ -1,9 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getProduct } from "@/data/products";
 import orcLogo from "@/assets/logos/orc.png";
-import { runRagSearch } from "@/lib/rag.functions";
+import { TopProgressBar } from "@/components/TopProgressBar";
 import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,9 +161,15 @@ function Workspace() {
   const [aiText, setAiText] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string>("");
+  const [aiProgress, setAiProgress] = useState(0);
+  const [aiStatusMessage, setAiStatusMessage] = useState("");
   const [docNeeded, setDocNeeded] = useState(false);
-  
-  const ragSearch = useServerFn(runRagSearch);
+  const searchAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => searchAbortRef.current?.abort();
+  }, []);
+
   const handleDocNeededChange = (checked: boolean) => {
     setDocNeeded(checked);
 
@@ -173,6 +178,8 @@ function Workspace() {
       setAiText("");
       setAiError("");
       setAiLoading(false);
+      setAiProgress(0);
+      setAiStatusMessage("");
     }
   };
 
@@ -191,6 +198,8 @@ function Workspace() {
     setAiLoading(true);
     setAiError("");
     setAiText("");
+    setAiProgress(0);
+    setAiStatusMessage("");
     const timeframe = mode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
     const requestPayload = {
       queryText: query.trim(),
@@ -205,20 +214,41 @@ function Workspace() {
     const finalPayload = toBackendPayload(requestPayload);
 
     console.info("[RAG UI final payload]", finalPayload);
-    console.info("[RAG UI curl equivalent]", buildCurlEquivalent(finalPayload, requestPayload.endpoint));
+    console.info(
+      "[RAG UI curl equivalent]",
+      buildCurlEquivalent(finalPayload, requestPayload.endpoint),
+    );
+
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
 
     try {
-      const data = await ragSearch({ data: requestPayload });
+      await streamRagRequest({
+        endpoint: requestPayload.endpoint,
+        payload: finalPayload,
+        signal: controller.signal,
+        onProgress: (event) => {
+          setAiProgress(event.percent);
+          if (event.message) setAiStatusMessage(event.message);
+        },
+        onComplete: (data) => {
+          console.info("[RAG UI raw stream response]", data);
+          console.info("[RAG UI render source]", {
+            rendersField: docNeeded ? "full generate-doc response" : "answer",
+            rawLlmResponse: docNeeded ? data : data.answer,
+          });
 
-      console.info("[RAG UI raw server-fn response]", data);
-      console.info("[RAG UI render source]", {
-        rendersField: docNeeded ? "full generate-doc response" : "answer",
-        rawLlmResponse: docNeeded ? data : data.answer,
+          const answer = docNeeded ? normalizeRagAnswer(data) : rawAnswerText(data.answer);
+          setAiText(answer);
+          setAiProgress(100);
+        },
+        onError: (message) => {
+          setAiError(message);
+        },
       });
-
-      const answer = docNeeded ? normalizeRagAnswer(data) : rawAnswerText(data.answer);
-      setAiText(answer);
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setAiError(e instanceof Error ? e.message : "Failed to fetch RAG API response");
     } finally {
       setAiLoading(false);
@@ -333,7 +363,10 @@ function Workspace() {
               </SelectContent>
             </Select>
 
-            <Select value={limit === undefined ? "" : String(limit)} onValueChange={(value) => setLimit(Number(value))}>
+            <Select
+              value={limit === undefined ? "" : String(limit)}
+              onValueChange={(value) => setLimit(Number(value))}
+            >
               <SelectTrigger className="h-10 w-[110px] !text-black">
                 <SelectValue placeholder="Limit" />
               </SelectTrigger>
@@ -380,10 +413,14 @@ function Workspace() {
         </div>
         {mode === "standard" && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Time frame applies to Standard searches. If no dates are selected, the default
-            search window is the last 30 days.
+            Time frame applies to Standard searches. If no dates are selected, the default search
+            window is the last 30 days.
           </p>
         )}
+
+        <div className="mt-4">
+          <TopProgressBar active={aiLoading} progress={aiProgress} inline />
+        </div>
 
         {/* Results */}
         <section className="mt-6">
@@ -431,7 +468,7 @@ function Workspace() {
                           className="h-12 w-16 object-contain logo-float"
                         />
                       </span>
-                      Generating {mode === "standard" ? "release summary" : "answer"}…
+                      {aiStatusMessage || "…"}
                     </p>
                   ) : aiError ? (
                     <p className="text-sm text-destructive">{aiError}</p>
@@ -919,6 +956,117 @@ function buildCurlEquivalent(payload: BackendRagPayload, endpoint: UiRagRequest[
   ].join("\n");
 }
 
+type RagProgressEvent = { stage: string; message?: string; percent: number };
+
+// EventSource only supports GET, so SSE progress is consumed manually over a POST fetch stream.
+async function streamRagRequest({
+  endpoint,
+  payload,
+  signal,
+  onProgress,
+  onComplete,
+  onError,
+}: {
+  endpoint: UiRagRequest["endpoint"];
+  payload: BackendRagPayload;
+  signal: AbortSignal;
+  onProgress: (event: RagProgressEvent) => void;
+  onComplete: (data: any) => void;
+  onError: (message: string) => void;
+}) {
+  const base = import.meta.env.BASE_URL.replace(/\/+$/, "");
+  const path = endpoint === "generate-doc" ? "/api/v1/rag-go/generate-doc" : "/api/v1/rag-go";
+  const url = `${base}${path}?stream=true`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok || !response.body) {
+    const text = await response.text().catch(() => "");
+    onError(text || `RAG stream request failed with status ${response.status}`);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let separatorIndex = buffer.indexOf("\n\n");
+    while (separatorIndex !== -1) {
+      const frame = buffer.slice(0, separatorIndex);
+      buffer = buffer.slice(separatorIndex + 2);
+      handleSseFrame(frame, { onProgress, onComplete, onError });
+      separatorIndex = buffer.indexOf("\n\n");
+    }
+  }
+
+  if (buffer.trim()) {
+    handleSseFrame(buffer, { onProgress, onComplete, onError });
+  }
+}
+
+function handleSseFrame(
+  frame: string,
+  handlers: {
+    onProgress: (event: RagProgressEvent) => void;
+    onComplete: (data: any) => void;
+    onError: (message: string) => void;
+  },
+) {
+  let eventName = "message";
+  const dataLines: string[] = [];
+
+  for (const rawLine of frame.split("\n")) {
+    const line = rawLine.trimEnd();
+    if (!line || line.startsWith(":")) continue;
+    if (line.startsWith("event:")) {
+      eventName = line.slice("event:".length).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trim());
+    }
+  }
+
+  if (dataLines.length === 0) return;
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(dataLines.join("\n"));
+  } catch {
+    return;
+  }
+
+  if (eventName === "progress") {
+    onSseProgress(parsed, handlers.onProgress);
+  } else if (eventName === "complete") {
+    handlers.onComplete(parsed);
+  } else if (eventName === "error") {
+    handlers.onError(
+      typeof parsed?.error === "string" ? parsed.error : "RAG stream reported an error.",
+    );
+  }
+  // unrecognized event names are ignored safely
+}
+
+function onSseProgress(parsed: any, onProgress: (event: RagProgressEvent) => void) {
+  onProgress({
+    stage: typeof parsed?.stage === "string" ? parsed.stage : "",
+    message: typeof parsed?.message === "string" ? parsed.message : undefined,
+    percent: typeof parsed?.percent === "number" ? parsed.percent : 0,
+  });
+}
+
 function TimeframePicker({
   fromDate,
   toDate,
@@ -1083,12 +1231,19 @@ function GenerateDocumentDialog({
   const [hasCustomTitle, setHasCustomTitle] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
   const [docError, setDocError] = useState("");
-  const ragSearch = useServerFn(runRagSearch);
+  const [docProgress, setDocProgress] = useState(0);
+  const [docStatusMessage, setDocStatusMessage] = useState("");
+  const docAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => docAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
 
-    const nextTitle = providedTitle || generateDocumentTitle(query, aiText, component || productName);
+    const nextTitle =
+      providedTitle || generateDocumentTitle(query, aiText, component || productName);
 
     if (!hasCustomTitle) {
       setTitle(nextTitle);
@@ -1123,6 +1278,12 @@ function GenerateDocumentDialog({
 
     setDocLoading(true);
     setDocError("");
+    setDocProgress(0);
+    setDocStatusMessage("");
+
+    docAbortRef.current?.abort();
+    const controller = new AbortController();
+    docAbortRef.current = controller;
 
     try {
       const timeframe = mode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
@@ -1133,24 +1294,42 @@ function GenerateDocumentDialog({
         limit,
         endpoint: "generate-doc",
         ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
-        // bust cache to force fresh server-fn invocation
+        // bust cache to force fresh request
         bustCache: Date.now(),
       } as const;
       const finalPayload = toBackendPayload(requestPayload);
       console.info("[RAG UI document final payload]", finalPayload);
-      console.info("[RAG UI document curl equivalent]", buildCurlEquivalent(finalPayload, "generate-doc"));
+      console.info(
+        "[RAG UI document curl equivalent]",
+        buildCurlEquivalent(finalPayload, "generate-doc"),
+      );
 
-      const data = await ragSearch({
-        data: requestPayload,
+      await streamRagRequest({
+        endpoint: "generate-doc",
+        payload: finalPayload,
+        signal: controller.signal,
+        onProgress: (event) => {
+          setDocProgress(event.percent);
+          if (event.message) setDocStatusMessage(event.message);
+        },
+        onComplete: (data) => {
+          console.info("[RAG UI raw generate-doc stream response]", data);
+          setDocProgress(100);
+          const generatedAnswer = normalizeRagAnswer(data);
+          const generatedDoc = parseDocDecisionResponse(generatedAnswer);
+          const markdown = addTitleToMarkdown(
+            resolvedTitle,
+            generatedDoc.markdown || generatedAnswer,
+          );
+          downloadMarkdownDocument(resolvedTitle, markdown);
+          onOpenChange(false);
+        },
+        onError: (message) => {
+          setDocError(message);
+        },
       });
-
-      console.info("[RAG UI raw generate-doc response]", data);
-      const generatedAnswer = normalizeRagAnswer(data);
-      const generatedDoc = parseDocDecisionResponse(generatedAnswer);
-      const markdown = addTitleToMarkdown(resolvedTitle, generatedDoc.markdown || generatedAnswer);
-      downloadMarkdownDocument(resolvedTitle, markdown);
-      onOpenChange(false);
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setDocError(e instanceof Error ? e.message : "Failed to generate document.");
     } finally {
       setDocLoading(false);
@@ -1159,6 +1338,7 @@ function GenerateDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <TopProgressBar active={docLoading} progress={docProgress} />
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Generate Document</DialogTitle>
@@ -1179,6 +1359,9 @@ function GenerateDocumentDialog({
             />
           </div>
 
+          {docLoading && docStatusMessage && (
+            <p className="text-sm text-muted-foreground">{docStatusMessage}</p>
+          )}
           {docError && <p className="text-sm text-destructive">{docError}</p>}
         </div>
 
@@ -1320,7 +1503,6 @@ function findDocumentLinks(record: any, repoId: string): DocumentLink[] {
   if (!targetDocRef) return [];
   const targetHref = buildRepoDocumentHref(repoId, targetDocRef);
   return [targetHref ? { label: targetDocRef, href: targetHref } : { label: targetDocRef }];
-
 }
 
 function normalizeDocumentHref(href: string) {
@@ -1397,8 +1579,7 @@ function objectValue(value: unknown) {
 function arrayOfObjects(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.filter(
-    (item): item is any =>
-      Boolean(item) && typeof item === "object" && !Array.isArray(item),
+    (item): item is any => Boolean(item) && typeof item === "object" && !Array.isArray(item),
   ) as any[];
 }
 

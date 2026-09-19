@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductsProductIdRouteImport } from './routes/products.$productId'
+import { Route as ApiV1RagGoRouteImport } from './routes/api.v1.rag-go'
+import { Route as ApiV1RagGoGenerateDocRouteImport } from './routes/api.v1.rag-go.generate-doc'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +24,61 @@ const ProductsProductIdRoute = ProductsProductIdRouteImport.update({
   path: '/products/$productId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1RagGoRoute = ApiV1RagGoRouteImport.update({
+  id: '/api/v1/rag-go',
+  path: '/api/v1/rag-go',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1RagGoGenerateDocRoute = ApiV1RagGoGenerateDocRouteImport.update({
+  id: '/generate-doc',
+  path: '/generate-doc',
+  getParentRoute: () => ApiV1RagGoRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/products/$productId': typeof ProductsProductIdRoute
+  '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
+  '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/products/$productId': typeof ProductsProductIdRoute
+  '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
+  '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/products/$productId': typeof ProductsProductIdRoute
+  '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
+  '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/products/$productId'
+  fullPaths:
+    | '/'
+    | '/products/$productId'
+    | '/api/v1/rag-go'
+    | '/api/v1/rag-go/generate-doc'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/products/$productId'
-  id: '__root__' | '/' | '/products/$productId'
+  to:
+    | '/'
+    | '/products/$productId'
+    | '/api/v1/rag-go'
+    | '/api/v1/rag-go/generate-doc'
+  id:
+    | '__root__'
+    | '/'
+    | '/products/$productId'
+    | '/api/v1/rag-go'
+    | '/api/v1/rag-go/generate-doc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProductsProductIdRoute: typeof ProductsProductIdRoute
+  ApiV1RagGoRoute: typeof ApiV1RagGoRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +97,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsProductIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/rag-go': {
+      id: '/api/v1/rag-go'
+      path: '/api/v1/rag-go'
+      fullPath: '/api/v1/rag-go'
+      preLoaderRoute: typeof ApiV1RagGoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/rag-go/generate-doc': {
+      id: '/api/v1/rag-go/generate-doc'
+      path: '/generate-doc'
+      fullPath: '/api/v1/rag-go/generate-doc'
+      preLoaderRoute: typeof ApiV1RagGoGenerateDocRouteImport
+      parentRoute: typeof ApiV1RagGoRoute
+    }
   }
 }
+
+interface ApiV1RagGoRouteChildren {
+  ApiV1RagGoGenerateDocRoute: typeof ApiV1RagGoGenerateDocRoute
+}
+
+const ApiV1RagGoRouteChildren: ApiV1RagGoRouteChildren = {
+  ApiV1RagGoGenerateDocRoute: ApiV1RagGoGenerateDocRoute,
+}
+
+const ApiV1RagGoRouteWithChildren = ApiV1RagGoRoute._addFileChildren(
+  ApiV1RagGoRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProductsProductIdRoute: ProductsProductIdRoute,
+  ApiV1RagGoRoute: ApiV1RagGoRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

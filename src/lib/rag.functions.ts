@@ -1,15 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
-const configuredRagBaseUrl =
-  process.env["RAG_BASE_URL"]?.trim() || process.env["RAG_BASE_HOST"]?.trim();
-const RAG_BASE_URL = normalizeRagBaseUrl(configuredRagBaseUrl || "http://orca-infer.ai");
-const RAG_PATH = "/api/v1/rag-go";
-
-function normalizeRagBaseUrl(value: string) {
-  const withProtocol = /^https?:\/\//i.test(value) ? value : `http://${value}`;
-  return withProtocol.replace(/\/+$/, "");
-}
+import { RAG_BASE_URL, RAG_PATH } from "@/lib/rag.config";
 
 const InputSchema = z.object({
   queryText: z.string().min(1),
@@ -54,12 +45,13 @@ export const runRagSearch = createServerFn({ method: "POST" })
     };
     const body = JSON.stringify(payload);
 
-    const ENABLE_RAG_CACHE = (process.env['ENABLE_RAG_CACHE'] || "false").toLowerCase() === "true";
+    const ENABLE_RAG_CACHE = (process.env["ENABLE_RAG_CACHE"] || "false").toLowerCase() === "true";
     const cacheStatus = ENABLE_RAG_CACHE ? "enabled" : "disabled";
 
     // generate a request UUID and timestamp for diagnostics
     const requestUuid =
-      typeof (globalThis as any).crypto === "object" && typeof (globalThis as any).crypto.randomUUID === "function"
+      typeof (globalThis as any).crypto === "object" &&
+      typeof (globalThis as any).crypto.randomUUID === "function"
         ? (globalThis as any).crypto.randomUUID()
         : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const backendRequestTimestamp = new Date().toISOString();
@@ -130,7 +122,10 @@ export const runRagSearch = createServerFn({ method: "POST" })
     if (typeof cacheIndicator === "string") {
       if (cacheIndicator.toLowerCase() === "hit" || cacheIndicator.toLowerCase() === "cache_hit") {
         console.info("[CACHE] cache hit");
-      } else if (cacheIndicator.toLowerCase() === "miss" || cacheIndicator.toLowerCase() === "cache_miss") {
+      } else if (
+        cacheIndicator.toLowerCase() === "miss" ||
+        cacheIndicator.toLowerCase() === "cache_miss"
+      ) {
         console.info("[CACHE] cache miss");
       }
     }
@@ -152,11 +147,7 @@ export const runRagSearch = createServerFn({ method: "POST" })
       chunkIds: pickFirstPresent(json, ["chunk_ids", "chunkIds"]),
       commitIds: pickFirstPresent(json, ["commit_ids", "commitIds"]),
       fileIds: pickFirstPresent(json, ["file_ids", "fileIds"]),
-      retrievalScores: pickFirstPresent(json, [
-        "retrieval_scores",
-        "retrievalScores",
-        "scores",
-      ]),
+      retrievalScores: pickFirstPresent(json, ["retrieval_scores", "retrievalScores", "scores"]),
       finalPrompt: pickFirstPresent(json, ["final_prompt", "finalPrompt", "prompt"]),
       modelSettings: pickFirstPresent(json, [
         "model_settings",
@@ -166,15 +157,15 @@ export const runRagSearch = createServerFn({ method: "POST" })
         "generation_config",
         "generationConfig",
       ]),
-      rawLlmResponse: json['answer'] ?? json,
+      rawLlmResponse: json["answer"] ?? json,
       diagnosticsAvailability:
         "If any field above is undefined, /api/v1/rag-go did not return it to this UI.",
     });
 
     // attach diagnostics for UI consumption
     try {
-      if (!json['debug'] || typeof json['debug'] !== "object") json['debug'] = {};
-      (json['debug'] as Record<string, unknown>)['_ui'] = {
+      if (!json["debug"] || typeof json["debug"] !== "object") json["debug"] = {};
+      (json["debug"] as Record<string, unknown>)["_ui"] = {
         requestUuid,
         backendRequestTimestamp,
         cacheStatus: cacheIndicator,
@@ -191,12 +182,12 @@ function pickFirstPresent(record: any, keys: string[]) {
     if (record[key] !== undefined) return record[key];
   }
 
-  const debug = record['debug'];
+  const debug = record["debug"];
   if (debug && typeof debug === "object" && !Array.isArray(debug)) {
     return pickFirstPresent(debug as Record<string, unknown>, keys);
   }
 
-  const meta = record['meta'];
+  const meta = record["meta"];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
     return pickFirstPresent(meta as Record<string, unknown>, keys);
   }
