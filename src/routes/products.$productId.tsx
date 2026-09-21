@@ -446,7 +446,11 @@ function Workspace() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <Sparkles className="h-3.5 w-3.5" />
-                    {mode === "standard" ? "AI Release Summary" : "AI Answer"}
+                    {aiLoading
+                      ? aiStatusMessage || "…"
+                      : mode === "standard"
+                        ? "AI Release Summary"
+                        : "AI Answer"}
                   </div>
                   {!docNeeded && (
                     <div className="flex shrink-0 gap-2">
@@ -468,7 +472,6 @@ function Workspace() {
                           className="h-12 w-16 object-contain logo-float"
                         />
                       </span>
-                      {aiStatusMessage || "…"}
                     </p>
                   ) : aiError ? (
                     <p className="text-sm text-destructive">{aiError}</p>
