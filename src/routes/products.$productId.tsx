@@ -449,7 +449,7 @@ function Workspace() {
                     ) : (
                       <>
                         <Sparkles className="h-3.5 w-3.5" />
-                        {mode === "standard" ? "Orca Answer" : "Orca Answer"}
+                        {mode === "standard" ? "Orca Ai Generated Answer" : "Orca Ai Generated Answer"}
                       </>
                     )}
                   </div>
