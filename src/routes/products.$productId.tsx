@@ -418,10 +418,6 @@ function Workspace() {
           </p>
         )}
 
-        <div className="mt-4">
-          <TopProgressBar active={aiLoading} progress={aiProgress} inline />
-        </div>
-
         {/* Results */}
         <section className="mt-6">
           {!hasSearched ? (
@@ -445,12 +441,17 @@ function Workspace() {
               <div className="mb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {aiLoading
-                      ? aiStatusMessage || "…"
-                      : mode === "standard"
-                        ? "AI Release Summary"
-                        : "AI Answer"}
+                    {aiLoading ? (
+                      <>
+                        <TopProgressBar active={aiLoading} inline />
+                        <span>{aiStatusMessage || "Generating answer..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {mode === "standard" ? "Orca Answer" : "Orca Answer"}
+                      </>
+                    )}
                   </div>
                   {!docNeeded && (
                     <div className="flex shrink-0 gap-2">
@@ -462,18 +463,7 @@ function Workspace() {
                   )}
                 </div>
                 <div className="mt-2">
-                  {aiLoading ? (
-                    <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="inline-flex h-12 w-16 items-center justify-center">
-                        <img
-                          src={orcLogo}
-                          alt=""
-                          aria-hidden="true"
-                          className="h-12 w-16 object-contain logo-float"
-                        />
-                      </span>
-                    </p>
-                  ) : aiError ? (
+                  {aiLoading ? null : aiError ? (
                     <p className="text-sm text-destructive">{aiError}</p>
                   ) : aiText ? (
                     docNeeded ? (
@@ -1363,7 +1353,10 @@ function GenerateDocumentDialog({
           </div>
 
           {docLoading && docStatusMessage && (
-            <p className="text-sm text-muted-foreground">{docStatusMessage}</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <TopProgressBar active={docLoading} inline />
+              <span>{docStatusMessage}</span>
+            </div>
           )}
           {docError && <p className="text-sm text-destructive">{docError}</p>}
         </div>
