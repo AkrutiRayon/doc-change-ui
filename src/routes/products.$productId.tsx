@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { differenceInCalendarDays } from "date-fns";
 import { getProduct } from "@/data/products";
 import orcLogo from "@/assets/logos/orc.png";
 import { TopProgressBar } from "@/components/TopProgressBar";
@@ -411,10 +412,10 @@ function Workspace() {
             </Button>
           </div>
         </div>
-        {mode === "standard" && (
+        {mode === "standard" && !docNeeded && (
           <p className="mt-2 text-xs text-muted-foreground">
             Time frame applies to Standard searches. If no dates are selected, the default search
-            window is the last 30 days.
+            window is the last 15 days.
           </p>
         )}
 
@@ -924,7 +925,12 @@ function stripMarkdown(value: string) {
 }
 
 function getStandardTimeframe(fromDate: string, toDate: string) {
-  if (fromDate && toDate) return { fromDate, toDate };
+  const from = parseDateValue(fromDate);
+  const to = parseDateValue(toDate);
+  const days = from && to ? differenceInCalendarDays(to, from) : -1;
+  if (days >= 0 && days <= 14) {
+    return { fromDate, toDate };
+  }
   return null;
 }
 
@@ -1071,6 +1077,7 @@ function TimeframePicker({
   disabled?: boolean;
   onChange: (fromDate: string, toDate: string) => void;
 }) {
+  const [rangeWarning, setRangeWarning] = useState(false);
   const selectedFrom = parseDateValue(fromDate);
   const selectedTo = parseDateValue(toDate);
   const label =
@@ -1092,6 +1099,7 @@ function TimeframePicker({
       <PopoverContent align="end" className="w-auto p-3">
         <Calendar
           mode="range"
+          max={14}
           numberOfMonths={2}
           defaultMonth={new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)}
           disabled={{ after: new Date() }}
@@ -1103,18 +1111,39 @@ function TimeframePicker({
                 }
               : undefined
           }
-          onSelect={(range) => {
+          onSelect={(range, selectedDay) => {
+            if (
+              selectedFrom &&
+              Math.abs(differenceInCalendarDays(selectedDay, selectedFrom)) > 14
+            ) {
+              setRangeWarning(true);
+              return;
+            }
+            setRangeWarning(false);
             onChange(
               range?.from ? toDateValue(range.from) : "",
               range?.to ? toDateValue(range.to) : "",
             );
           }}
         />
+        {rangeWarning && (
+          <p role="alert" className="px-3 text-xs text-destructive">
+            The current context window only allows a 1-15 day time window.
+          </p>
+        )}
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
           <p className="text-xs text-muted-foreground">
             {fromDate && toDate ? `${fromDate} to ${toDate}` : "Select from and to dates"}
           </p>
-          <Button type="button" variant="ghost" size="sm" onClick={() => onChange("", "")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setRangeWarning(false);
+              onChange("", "");
+            }}
+          >
             Clear
           </Button>
         </div>
