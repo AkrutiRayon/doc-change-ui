@@ -52,7 +52,7 @@ export const Route = createFileRoute("/products/$productId")({
 });
 
 const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as const;
-const PERFECTO_COMPONENTS = ["Quantum"] as const;
+const PERFECTO_COMPONENTS = ["Quantum", "AI-scriptless"] as const;
 const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const LIMITS = [10, 15, 20, 25];
@@ -68,6 +68,7 @@ const REPO_ID_BY_COMPONENT: Record<
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
   Quantum: "github.com/Perfecto-Quantum/Quantum-Starter-Kit",
+  "AI-scriptless": "github.com/PerfectoMobileDev/ai-commands-service",
   "p4-mcp": "github.com/perforce/p4mcp-server",
 };
 
@@ -109,6 +110,16 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
   {
     prompt: "How do I configure and run the p4 MCP server?",
     component: "p4-mcp",
+    mode: "direct",
+  },
+  {
+    prompt: "What changed in AI-scriptless in the last 30 days?",
+    component: "AI-scriptless",
+    mode: "standard",
+  },
+  {
+    prompt: "How do I get started with AI-scriptless?",
+    component: "AI-scriptless",
     mode: "direct",
   },
 ];
@@ -422,21 +433,19 @@ function Workspace() {
         {/* Results */}
         <section className="mt-6">
           {!hasSearched ? (
-            isPerfecto ? null : (
-              <EmptyState
-                examples={EXAMPLE_PROMPTS.filter((example) =>
-                  (activeComponents as readonly ComponentName[]).includes(example.component),
-                )}
-                onPick={(example) => {
-                  setQuery(example.prompt);
-                  setComponent(example.component);
-                  setMode(example.mode);
-                  setHasSearched(false);
-                  setAiText("");
-                  setAiError("");
-                }}
-              />
-            )
+            <EmptyState
+              examples={EXAMPLE_PROMPTS.filter((example) =>
+                (activeComponents as readonly ComponentName[]).includes(example.component),
+              )}
+              onPick={(example) => {
+                setQuery(example.prompt);
+                setComponent(example.component);
+                setMode(example.mode);
+                setHasSearched(false);
+                setAiText("");
+                setAiError("");
+              }}
+            />
           ) : (
             <>
               <div className="mb-4">
