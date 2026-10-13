@@ -9,6 +9,7 @@ import {
   setKeycloakRuntimeConfig,
 } from "@/lib/keycloak";
 import type { KeycloakRuntimeConfig } from "@/lib/keycloak";
+import { clearResponseHistory } from "@/lib/response-history";
 
 function AuthStatus({ message }: { message: string }) {
   return (
@@ -84,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === "onInitError" || event === "onAuthError" || event === "onAuthRefreshError") {
           setError("Sign-in failed. Please reload the page to try again.");
         } else if (event === "onAuthLogout") {
+          clearResponseHistory();
           setError("Your session has ended. Please reload the page to sign in again.");
         }
       }}

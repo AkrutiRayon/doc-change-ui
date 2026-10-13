@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { isKeycloakEnabled } from "@/lib/keycloak";
+import { clearResponseHistory } from "@/lib/response-history";
 
 export function UserAccountMenu() {
   if (!isKeycloakEnabled()) return null;
@@ -12,7 +13,7 @@ export function UserAccountMenu() {
 function AuthenticatedUserAccountMenu() {
   const { keycloak } = useKeycloak();
   const tokenUsername =
-    keycloak.tokenParsed?.preferred_username ?? keycloak.idTokenParsed?.preferred_username;
+    keycloak.tokenParsed?.["preferred_username"] ?? keycloak.idTokenParsed?.["preferred_username"];
   const [username, setUsername] = useState(
     typeof tokenUsername === "string" ? tokenUsername : "User",
   );
@@ -35,6 +36,7 @@ function AuthenticatedUserAccountMenu() {
 
   const logout = () => {
     setLoggingOut(true);
+    clearResponseHistory();
     void keycloak
       .logout({
         redirectUri: new URL(import.meta.env.BASE_URL, window.location.origin).toString(),

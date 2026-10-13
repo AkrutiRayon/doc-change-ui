@@ -39,11 +39,15 @@ export function getKeycloakClient(): Keycloak {
   return keycloakClient;
 }
 
+export function getKeycloakSubject(): string {
+  return keycloakClient?.subject ?? "anonymous";
+}
+
 export function getKeycloakInitOptions(): KeycloakInitOptions {
   return {
     onLoad: "login-required",
     pkceMethod: "S256",
-    checkLoginIframe: false,
+    checkLoginIframe: true,
     ...(typeof window !== "undefined" ? { redirectUri: window.location.href } : {}),
   };
 }
