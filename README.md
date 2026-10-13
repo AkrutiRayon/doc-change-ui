@@ -29,7 +29,7 @@ overridden in the app's runtime environment, such as the Kubernetes Deployment:
 
 ```dotenv
 VITE_KEYCLOAK_ENABLED=true
-VITE_KEYCLOAK_URL=https://orca-infer.ai
+VITE_KEYCLOAK_URL=https://orca-infer.ai/auth
 VITE_KEYCLOAK_REALM=orca
 VITE_KEYCLOAK_CLIENT_ID=orca-client
 ```
@@ -41,14 +41,14 @@ sent to the browser. Authentication is enabled by default and
 `VITE_KEYCLOAK_ENABLED=false` explicitly bypasses the UI gate for local
 development only.
 
-The Keycloak URL must be its actual externally reachable base URL. The URL above
-assumes Keycloak is served at the domain root; modern Keycloak does not use
-`/auth` by default. Its realm discovery endpoint must be reachable at
-`https://orca-infer.ai/realms/orca/.well-known/openid-configuration`, and
-advertise public HTTPS authorization and token endpoints.
+The Keycloak URL must match the path exposed by your gateway. This deployment
+routes `/auth` to Keycloak, so its realm discovery endpoint must be reachable at
+`https://orca-infer.ai/auth/realms/orca/.well-known/openid-configuration` and
+advertise public HTTPS authorization and token endpoints. Configure Keycloak to
+serve under `/auth`, or configure the gateway to rewrite `/auth` to `/` when
+forwarding to a Keycloak instance serving at its default root path.
 
-Configure your ingress to route `/ui` to this app and Keycloak's root-relative
-paths (including `/realms` and `/resources`) to Keycloak.
+Configure your ingress to route `/ui` to this app and `/auth` to Keycloak.
 If visitors should enter at `https://orca-infer.ai/`, configure a root redirect
 to `/ui/` in your ingress. The app's router currently uses `/ui` as its base.
 
@@ -62,7 +62,7 @@ audience, expiry and required permissions on the server. Do not trust decoded
 tokens without verification. No API authorization was added by this UI setup.
 
 After deployment, open `/ui/` in a private browser window, verify the redirect
-goes to `/realms/orca/protocol/openid-connect/auth`, complete sign-in,
+goes to `/auth/realms/orca/protocol/openid-connect/auth`, complete sign-in,
 and verify you return to `/ui/` (or the product route you opened). Test a reload
 and a session expiry as well. A successful build cannot verify the deployed
 realm, ingress, redirect URI allowlist or login credentials.

@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/runtime-config")({
         return Response.json(
           {
             enabled: value("VITE_KEYCLOAK_ENABLED", "true").toLowerCase() !== "false",
-            url: value("VITE_KEYCLOAK_URL", "https://orca-infer.ai"),
+            url: value("VITE_KEYCLOAK_URL", "https://orca-infer.ai/auth"),
             realm: value("VITE_KEYCLOAK_REALM", "orca"),
             clientId: value("VITE_KEYCLOAK_CLIENT_ID", "orca-client"),
           },
