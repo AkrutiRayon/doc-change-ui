@@ -52,7 +52,7 @@ export const Route = createFileRoute("/products/$productId")({
 });
 
 const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as const;
-const PERFECTO_COMPONENTS = ["Quantum"] as const;
+const PERFECTO_COMPONENTS = ["Quantum", "AI-cmd", "scriptless-mobile-backend"] as const;
 const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const LIMITS = [10, 15, 20, 25];
@@ -68,6 +68,8 @@ const REPO_ID_BY_COMPONENT: Record<
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
   Quantum: "github.com/Perfecto-Quantum/Quantum-Starter-Kit",
+  "AI-cmd": "github.com/PerfectoMobileDev/ai-commands-service",
+  "scriptless-mobile-backend": "github.com/PerfectoMobileDev/scriptless-mobile-backend",
   "p4-mcp": "github.com/perforce/p4mcp-server",
 };
 
