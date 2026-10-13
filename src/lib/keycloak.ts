@@ -1,44 +1,34 @@
 import Keycloak, { type KeycloakConfig, type KeycloakInitOptions } from "keycloak-js";
 
-type ViteEnvLike = {
-  VITE_KEYCLOAK_URL?: string;
-  VITE_KEYCLOAK_REALM?: string;
-  VITE_KEYCLOAK_CLIENT_ID?: string;
-  VITE_KEYCLOAK_ENABLED?: string;
+export type KeycloakRuntimeConfig = {
+  enabled: boolean;
+  url: string;
+  realm: string;
+  clientId: string;
 };
 
 let keycloakClient: Keycloak | null = null;
-
-function env(): ViteEnvLike {
-  return import.meta.env as unknown as ViteEnvLike;
-}
+let runtimeConfig: KeycloakRuntimeConfig | null = null;
 
 function normalizeBaseUrl(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
+export function setKeycloakRuntimeConfig(config: KeycloakRuntimeConfig): void {
+  runtimeConfig = config;
+}
+
 export function isKeycloakEnabled(): boolean {
-  const raw = env().VITE_KEYCLOAK_ENABLED;
-  if (raw == null) return true;
-  return raw.toLowerCase() === "true";
+  return runtimeConfig?.enabled ?? true;
 }
 
 export function getKeycloakConfig(): KeycloakConfig {
-  const viteEnv = env();
-  const url = viteEnv.VITE_KEYCLOAK_URL;
-  const realm = viteEnv.VITE_KEYCLOAK_REALM;
-  const clientId = viteEnv.VITE_KEYCLOAK_CLIENT_ID;
-
-  if (!url || !realm || !clientId) {
-    throw new Error(
-      "Missing Keycloak configuration. Set VITE_KEYCLOAK_URL, VITE_KEYCLOAK_REALM, and VITE_KEYCLOAK_CLIENT_ID.",
-    );
-  }
+  if (!runtimeConfig) throw new Error("Keycloak runtime configuration has not been loaded.");
 
   return {
-    url: normalizeBaseUrl(url),
-    realm,
-    clientId,
+    url: normalizeBaseUrl(runtimeConfig.url),
+    realm: runtimeConfig.realm,
+    clientId: runtimeConfig.clientId,
   };
 }
 

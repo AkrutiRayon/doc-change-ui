@@ -2,7 +2,13 @@ import { ReactKeycloakProvider, useKeycloak } from "@react-keycloak/web";
 import { useEffect, useState, type ReactNode } from "react";
 import type Keycloak from "keycloak-js";
 import type { KeycloakInitOptions } from "keycloak-js";
-import { getKeycloakClient, getKeycloakInitOptions, isKeycloakEnabled } from "@/lib/keycloak";
+import {
+  getKeycloakClient,
+  getKeycloakInitOptions,
+  isKeycloakEnabled,
+  setKeycloakRuntimeConfig,
+} from "@/lib/keycloak";
+import type { KeycloakRuntimeConfig } from "@/lib/keycloak";
 
 function AuthStatus({ message }: { message: string }) {
   return (
@@ -32,13 +38,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } | null>(null);
 
   useEffect(() => {
-    setReady(true);
-    if (!isKeycloakEnabled()) return;
-    try {
-      setAuth({ client: getKeycloakClient(), options: getKeycloakInitOptions() });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Authentication configuration failed.");
+    let cancelled = false;
+
+    async function initializeAuth() {
+      try {
+        const response = await fetch(`${import.meta.env.BASE_URL}api/runtime-config`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+          throw new Error(`Could not load runtime configuration (${response.status}).`);
+        }
+
+        const config = (await response.json()) as KeycloakRuntimeConfig;
+        if (cancelled) return;
+
+        setKeycloakRuntimeConfig(config);
+        if (isKeycloakEnabled()) {
+          setAuth({ client: getKeycloakClient(), options: getKeycloakInitOptions() });
+        }
+        setReady(true);
+      } catch (cause) {
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : "Authentication configuration failed.");
+        }
+      }
     }
+
+    void initializeAuth();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (error) return <AuthStatus message={error} />;

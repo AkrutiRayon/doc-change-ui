@@ -11,7 +11,7 @@ are not saved to localStorage.
 
 In your realm, create an OpenID Connect client with these settings:
 
-- Client ID: `orca-ui` (or your existing client ID).
+- Client ID: `orca-client` (or your existing client ID).
 - Client authentication: Off (public browser client; no client secret).
 - Standard flow: On.
 - Implicit flow and direct access grants: Off unless another application needs them.
@@ -24,28 +24,31 @@ and `http://localhost:8080` to web origins. Visit `http://localhost:8080/ui/`.
 
 ## Deployment Configuration
 
-Set these public environment variables before running `npm run build`:
+These public environment variables default in the server code and can be
+overridden in the app's runtime environment, such as the Kubernetes Deployment:
 
 ```dotenv
 VITE_KEYCLOAK_ENABLED=true
-VITE_KEYCLOAK_URL=https://orca-infer.ai/auth
-VITE_KEYCLOAK_REALM=your-realm
-VITE_KEYCLOAK_CLIENT_ID=orca-ui
+VITE_KEYCLOAK_URL=https://orca-infer.ai
+VITE_KEYCLOAK_REALM=orca
+VITE_KEYCLOAK_CLIENT_ID=orca-client
 ```
 
-Vite embeds these values at build time; changing only the deployed container's
-runtime environment will not update the browser bundle. Never put secrets in
-`VITE_*` variables. Authentication is enabled by default and fails closed if
-configuration is missing. `VITE_KEYCLOAK_ENABLED=false` explicitly bypasses the
-UI gate for local development only.
+The app fetches these values from its same-origin runtime-config endpoint when
+it starts, so changing the deployed container's environment does not require a
+new image build. Never put secrets in `VITE_*` variables; these settings are
+sent to the browser. Authentication is enabled by default and
+`VITE_KEYCLOAK_ENABLED=false` explicitly bypasses the UI gate for local
+development only.
 
-The Keycloak URL must be its actual externally reachable base URL. Use `/auth`
-only if your ingress/Keycloak deployment serves it there; modern Keycloak does
-not use `/auth` by default. Its realm discovery endpoint must be reachable at
-`https://orca-infer.ai/auth/realms/your-realm/.well-known/openid-configuration`,
-and advertise public HTTPS authorization and token endpoints.
+The Keycloak URL must be its actual externally reachable base URL. The URL above
+assumes Keycloak is served at the domain root; modern Keycloak does not use
+`/auth` by default. Its realm discovery endpoint must be reachable at
+`https://orca-infer.ai/realms/orca/.well-known/openid-configuration`, and
+advertise public HTTPS authorization and token endpoints.
 
-Configure your ingress to route `/ui` to this app and `/auth` to Keycloak.
+Configure your ingress to route `/ui` to this app and Keycloak's root-relative
+paths (including `/realms` and `/resources`) to Keycloak.
 If visitors should enter at `https://orca-infer.ai/`, configure a root redirect
 to `/ui/` in your ingress. The app's router currently uses `/ui` as its base.
 
@@ -59,7 +62,7 @@ audience, expiry and required permissions on the server. Do not trust decoded
 tokens without verification. No API authorization was added by this UI setup.
 
 After deployment, open `/ui/` in a private browser window, verify the redirect
-goes to `/auth/realms/<realm>/protocol/openid-connect/auth`, complete sign-in,
+goes to `/realms/orca/protocol/openid-connect/auth`, complete sign-in,
 and verify you return to `/ui/` (or the product route you opened). Test a reload
 and a session expiry as well. A successful build cannot verify the deployed
 realm, ingress, redirect URI allowlist or login credentials.
