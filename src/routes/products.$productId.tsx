@@ -8,7 +8,7 @@ import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles } from
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -279,11 +279,7 @@ function Workspace() {
               {productName}
             </Badge>
           </div>
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-              JS
-            </AvatarFallback>
-          </Avatar>
+          <UserAccountMenu />
         </div>
       </header>
 
