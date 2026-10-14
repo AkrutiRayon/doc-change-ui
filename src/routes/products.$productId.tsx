@@ -4,7 +4,14 @@ import { differenceInCalendarDays } from "date-fns";
 import { getProduct } from "@/data/products";
 import orcLogo from "@/assets/logos/orc.png";
 import { TopProgressBar } from "@/components/TopProgressBar";
-import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar as CalendarIcon,
+  FileText,
+  Loader2,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -180,6 +187,7 @@ function Workspace() {
   const [genOpen, setGenOpen] = useState(false);
   const [aiText, setAiText] = useState<string>("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiCancelled, setAiCancelled] = useState(false);
   const [aiError, setAiError] = useState<string>("");
   const [aiProgress, setAiProgress] = useState(0);
   const [aiStatusMessage, setAiStatusMessage] = useState("");
@@ -201,10 +209,12 @@ function Workspace() {
     setDocNeeded(checked);
 
     if (!checked) {
+      searchAbortRef.current?.abort();
       setHasSearched(false);
       setAiText("");
       setAiError("");
       setAiLoading(false);
+      setAiCancelled(false);
       setAiProgress(0);
       setAiStatusMessage("");
     }
@@ -229,6 +239,7 @@ function Workspace() {
     setAiText(entry.response);
     setAiError("");
     setAiLoading(false);
+    setAiCancelled(false);
     setGenOpen(false);
     setResultTab("response");
   };
@@ -246,6 +257,7 @@ function Workspace() {
 
     setHasSearched(true);
     setAiLoading(true);
+    setAiCancelled(false);
     setAiError("");
     setAiText("");
     setAiProgress(0);
@@ -284,11 +296,13 @@ function Workspace() {
         payload: finalPayload,
         signal: controller.signal,
         onProgress: (event) => {
+          setAiCancelled(false);
           setAiError("");
           setAiProgress(event.percent);
           if (event.message) setAiStatusMessage(event.message);
         },
         onComplete: (data) => {
+          setAiCancelled(false);
           setAiError("");
           console.info("[RAG UI raw stream response]", data);
           console.info("[RAG UI render source]", {
@@ -308,15 +322,26 @@ function Workspace() {
           setAiProgress(100);
         },
         onError: (message) => {
+          setAiCancelled(false);
           setAiError(message);
         },
       });
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (controller.signal.aborted || (e instanceof DOMException && e.name === "AbortError"))
+        return;
       setAiError(e instanceof Error ? e.message : "Failed to fetch RAG API response");
     } finally {
       setAiLoading(false);
+      if (searchAbortRef.current === controller) searchAbortRef.current = null;
     }
+  };
+
+  const cancelSearch = () => {
+    if (!searchAbortRef.current) return;
+    setAiCancelled(true);
+    setAiError("");
+    setAiStatusMessage("Request cancelled.");
+    searchAbortRef.current.abort();
   };
 
   if (!isSupportedProduct) {
@@ -436,15 +461,14 @@ function Workspace() {
             )}
 
             <Button
-              aria-label="Search"
-              onClick={handleSearch}
-              disabled={aiLoading}
+              aria-label={aiLoading ? "Cancel request" : "Search"}
+              onClick={aiLoading ? cancelSearch : handleSearch}
               className="h-10 gap-2 rounded-lg !bg-black px-5 font-medium !text-white shadow-md shadow-black/10 transition-all hover:-translate-y-0.5 hover:!bg-black hover:!text-white hover:shadow-lg hover:shadow-black/20 active:translate-y-0 active:!bg-black"
             >
               {aiLoading ? (
                 <>
-                  Search
-                  <Sparkles className="h-4 w-4 animate-pulse" />
+                  Cancel
+                  <X className="h-4 w-4" />
                 </>
               ) : (
                 <>
@@ -516,7 +540,9 @@ function Workspace() {
                       )}
                     </div>
                     <div className="mt-2">
-                      {aiLoading ? null : aiError ? (
+                      {aiLoading ? null : aiCancelled ? (
+                        <p className="text-sm text-muted-foreground">{aiStatusMessage}</p>
+                      ) : aiError ? (
                         <p className="text-sm text-destructive">{aiError}</p>
                       ) : aiText ? (
                         docNeeded ? (
@@ -1385,6 +1411,7 @@ function GenerateDocumentDialog({
   const [docProgress, setDocProgress] = useState(0);
   const [docStatusMessage, setDocStatusMessage] = useState("");
   const docAbortRef = useRef<AbortController | null>(null);
+  const docCompletedRef = useRef(false);
 
   useEffect(() => {
     return () => docAbortRef.current?.abort();
@@ -1401,6 +1428,21 @@ function GenerateDocumentDialog({
       setLastAutoTitle(nextTitle);
     }
   }, [open, productName, query, aiText, component, hasCustomTitle, providedTitle]);
+
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && docLoading && !docCompletedRef.current) {
+      docAbortRef.current?.abort();
+      setDocStatusMessage("Request cancelled.");
+    }
+    onOpenChange(nextOpen);
+  };
+
+  const cancelDocument = () => {
+    if (!docAbortRef.current) return;
+    setDocStatusMessage("Request cancelled.");
+    setDocError("");
+    docAbortRef.current.abort();
+  };
 
   const handleGenerate = async () => {
     const resolvedTitle =
@@ -1435,6 +1477,7 @@ function GenerateDocumentDialog({
     docAbortRef.current?.abort();
     const controller = new AbortController();
     docAbortRef.current = controller;
+    docCompletedRef.current = false;
 
     try {
       const timeframe = mode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
@@ -1465,6 +1508,7 @@ function GenerateDocumentDialog({
           if (event.message) setDocStatusMessage(event.message);
         },
         onComplete: (data) => {
+          docCompletedRef.current = true;
           setDocError("");
           console.info("[RAG UI raw generate-doc stream response]", data);
           setDocProgress(100);
@@ -1483,15 +1527,17 @@ function GenerateDocumentDialog({
         },
       });
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (controller.signal.aborted || (e instanceof DOMException && e.name === "AbortError"))
+        return;
       setDocError(e instanceof Error ? e.message : "Failed to generate document.");
     } finally {
       setDocLoading(false);
+      if (docAbortRef.current === controller) docAbortRef.current = null;
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <TopProgressBar active={docLoading} progress={docProgress} />
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -1513,9 +1559,9 @@ function GenerateDocumentDialog({
             />
           </div>
 
-          {docLoading && docStatusMessage && (
+          {docStatusMessage && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <TopProgressBar active={docLoading} inline />
+              {docLoading && <TopProgressBar active inline />}
               <span>{docStatusMessage}</span>
             </div>
           )}
@@ -1523,9 +1569,15 @@ function GenerateDocumentDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
             Cancel
           </Button>
+          {docLoading && (
+            <Button variant="outline" onClick={cancelDocument}>
+              Cancel request
+              <X className="h-4 w-4" />
+            </Button>
+          )}
           <Button onClick={handleGenerate} disabled={docLoading}>
             {docLoading && <Loader2 className="h-4 w-4 animate-spin" />}
             Generate Document
