@@ -98,7 +98,7 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
   {
     prompt: "How to set specific chromedriver version in selenium executor test?",
     component: "Taurus",
-    mode: "standard",
+    mode: "direct",
     docNeeded: true,
   },
   {
@@ -112,7 +112,7 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
     mode: "standard",
   },
   {
-    prompt: "What changed in p4-mcp in the last 30 days?",
+    prompt: "What changed in p4-mcp?",
     component: "p4-mcp",
     mode: "standard",
   },
@@ -122,8 +122,8 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
     mode: "direct",
   },
   {
-    prompt: "What changed in AI-scriptless in the last 30 days?",
-    component: "AI-scriptless",
+    prompt: "What changed in scriptless-mobile-backend?",
+    component: "scriptless-mobile-backend",
     mode: "standard",
   },
   {
