@@ -1099,15 +1099,22 @@ async function streamRagRequest({
   const path = endpoint === "generate-doc" ? "/api/v1/rag-go/generate-doc" : "/api/v1/rag-go";
   const url = `${base}${path}?stream=true`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-    },
-    body: JSON.stringify(payload),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify(payload),
+      signal,
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    onError("Connection to the RAG backend failed before the stream started.");
+    return;
+  }
 
   if (!response.ok || !response.body) {
     const text = await response.text().catch(() => "");
@@ -1133,7 +1140,15 @@ async function streamRagRequest({
   };
 
   while (true) {
-    const { value, done } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      if (signal.aborted) throw error;
+      onError("Connection to the RAG stream was interrupted before completion.");
+      return;
+    }
+    const { value, done } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     buffer = consumeSseFrames(buffer, handlers);

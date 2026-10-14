@@ -1,7 +1,6 @@
 import { RAG_BASE_URL, RAG_PATH } from "@/lib/rag.config";
 
 const KEEP_ALIVE_INTERVAL_MS = 15_000;
-const UPSTREAM_IDLE_TIMEOUT_MS = 5 * 60_000;
 
 // Streams the upstream RAG SSE response straight through to the browser (createServerFn can't stream).
 export async function proxyRagStream(request: Request, pathSuffix: string): Promise<Response> {
@@ -52,30 +51,15 @@ function keepEventStreamAlive(body: ReadableStream<Uint8Array>): ReadableStream<
   const reader = body.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  const heartbeat = new TextEncoder().encode(": keep-alive\n");
-  const idleTimeoutEvent = encoder.encode(
-    'event: error\ndata: {"error":"RAG backend stopped sending data for 5 minutes."}\n\n',
-  );
+  const heartbeat = encoder.encode(": keep-alive\n");
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   let pendingText = "";
   let isActive = true;
-  let lastUpstreamActivityAt = Date.now();
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
       heartbeatTimer = setInterval(() => {
-        if (!isActive) return;
-        if (Date.now() - lastUpstreamActivityAt >= UPSTREAM_IDLE_TIMEOUT_MS) {
-          isActive = false;
-          controller.enqueue(idleTimeoutEvent);
-          controller.close();
-          if (heartbeatTimer) clearInterval(heartbeatTimer);
-          void reader
-            .cancel()
-            .catch((error) => console.error("Failed to cancel idle RAG stream", error));
-          return;
-        }
-        controller.enqueue(heartbeat);
+        if (isActive) controller.enqueue(heartbeat);
       }, KEEP_ALIVE_INTERVAL_MS);
 
       void (async () => {
@@ -84,7 +68,6 @@ function keepEventStreamAlive(body: ReadableStream<Uint8Array>): ReadableStream<
             const { value, done } = await reader.read();
             if (done || !isActive) break;
 
-            lastUpstreamActivityAt = Date.now();
             const text = decoder.decode(value, { stream: true });
             if (text) {
               pendingText += text;
@@ -105,7 +88,15 @@ function keepEventStreamAlive(body: ReadableStream<Uint8Array>): ReadableStream<
           if (pendingText && isActive) controller.enqueue(encoder.encode(pendingText));
           if (isActive) controller.close();
         } catch (error) {
-          if (isActive) controller.error(error);
+          if (isActive) {
+            console.error("RAG upstream stream failed before completion", error);
+            controller.enqueue(
+              encoder.encode(
+                'event: error\ndata: {"error":"RAG backend stream was interrupted before completion."}\n\n',
+              ),
+            );
+            controller.close();
+          }
         } finally {
           isActive = false;
           if (heartbeatTimer) clearInterval(heartbeatTimer);
