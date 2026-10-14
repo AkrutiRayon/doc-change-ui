@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { UserAccountMenu } from "@/components/UserAccountMenu";
 
 export function SiteHeader() {
   const [dark, setDark] = useState(false);
@@ -35,13 +36,7 @@ export function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-foreground" />
-            </span>
-            Live updates
-          </span>
+          <UserAccountMenu />
           <button
             type="button"
             onClick={toggle}

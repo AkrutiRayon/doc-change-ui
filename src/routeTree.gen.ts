@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiRuntimeConfigRouteImport } from './routes/api.runtime-config'
 import { Route as ProductsProductIdRouteImport } from './routes/products.$productId'
 import { Route as ApiV1RagGoRouteImport } from './routes/api.v1.rag-go'
 import { Route as ApiV1RagGoGenerateDocRouteImport } from './routes/api.v1.rag-go.generate-doc'
@@ -17,6 +18,11 @@ import { Route as ApiV1RagGoGenerateDocRouteImport } from './routes/api.v1.rag-g
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRuntimeConfigRoute = ApiRuntimeConfigRouteImport.update({
+  id: '/api/runtime-config',
+  path: '/api/runtime-config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsProductIdRoute = ProductsProductIdRouteImport.update({
@@ -37,12 +43,14 @@ const ApiV1RagGoGenerateDocRoute = ApiV1RagGoGenerateDocRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/runtime-config': typeof ApiRuntimeConfigRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
   '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/runtime-config': typeof ApiRuntimeConfigRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
   '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
@@ -50,6 +58,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/runtime-config': typeof ApiRuntimeConfigRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
   '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
@@ -58,18 +67,21 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/runtime-config'
     | '/products/$productId'
     | '/api/v1/rag-go'
     | '/api/v1/rag-go/generate-doc'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/runtime-config'
     | '/products/$productId'
     | '/api/v1/rag-go'
     | '/api/v1/rag-go/generate-doc'
   id:
     | '__root__'
     | '/'
+    | '/api/runtime-config'
     | '/products/$productId'
     | '/api/v1/rag-go'
     | '/api/v1/rag-go/generate-doc'
@@ -77,6 +89,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiRuntimeConfigRoute: typeof ApiRuntimeConfigRoute
   ProductsProductIdRoute: typeof ProductsProductIdRoute
   ApiV1RagGoRoute: typeof ApiV1RagGoRouteWithChildren
 }
@@ -88,6 +101,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runtime-config': {
+      id: '/api/runtime-config'
+      path: '/api/runtime-config'
+      fullPath: '/api/runtime-config'
+      preLoaderRoute: typeof ApiRuntimeConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products/$productId': {
@@ -128,6 +148,7 @@ const ApiV1RagGoRouteWithChildren = ApiV1RagGoRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiRuntimeConfigRoute: ApiRuntimeConfigRoute,
   ProductsProductIdRoute: ProductsProductIdRoute,
   ApiV1RagGoRoute: ApiV1RagGoRouteWithChildren,
 }

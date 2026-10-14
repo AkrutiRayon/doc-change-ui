@@ -8,7 +8,7 @@ import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles } from
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAccountMenu } from "@/components/UserAccountMenu";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
@@ -30,6 +30,13 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getKeycloakSubject } from "@/lib/keycloak";
+import {
+  readResponseHistory,
+  saveResponseHistoryEntry,
+  type SavedResponse,
+} from "@/lib/response-history";
 
 export const Route = createFileRoute("/products/$productId")({
   head: () => ({
@@ -52,7 +59,7 @@ export const Route = createFileRoute("/products/$productId")({
 });
 
 const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as const;
-const PERFECTO_COMPONENTS = ["Quantum", "AI-scriptless"] as const;
+const PERFECTO_COMPONENTS = ["Quantum", "AI-cmd", "scriptless-mobile-backend"] as const;
 const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
 const REPO_ID_BY_COMPONENT: Record<
@@ -67,7 +74,8 @@ const REPO_ID_BY_COMPONENT: Record<
   "BZM-MCP": "github.com/Blazemeter/bzm-mcp",
   "SV-MCP": "github.com/Blazemeter/sv-mcp",
   Quantum: "github.com/Perfecto-Quantum/Quantum-Starter-Kit",
-  "AI-scriptless": "github.com/PerfectoMobileDev/ai-commands-service",
+  "AI-cmd": "github.com/PerfectoMobileDev/ai-commands-service",
+  "scriptless-mobile-backend": "github.com/PerfectoMobileDev/scriptless-mobile-backend",
   "p4-mcp": "github.com/perforce/p4mcp-server",
 };
 
@@ -176,7 +184,14 @@ function Workspace() {
   const [aiProgress, setAiProgress] = useState(0);
   const [aiStatusMessage, setAiStatusMessage] = useState("");
   const [docNeeded, setDocNeeded] = useState(false);
+  const [resultTab, setResultTab] = useState("response");
+  const [responseHistory, setResponseHistory] = useState<SavedResponse[]>([]);
   const searchAbortRef = useRef<AbortController | null>(null);
+  const keycloakSubject = getKeycloakSubject();
+
+  useEffect(() => {
+    setResponseHistory(readResponseHistory(keycloakSubject, productId));
+  }, [keycloakSubject, productId]);
 
   useEffect(() => {
     return () => searchAbortRef.current?.abort();
@@ -193,6 +208,29 @@ function Workspace() {
       setAiProgress(0);
       setAiStatusMessage("");
     }
+  };
+
+  const saveResponse = (response: Omit<SavedResponse, "id" | "productId" | "createdAt">) => {
+    const entry: SavedResponse = {
+      ...response,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      productId,
+      createdAt: Date.now(),
+    };
+    setResponseHistory(saveResponseHistoryEntry(keycloakSubject, entry));
+  };
+
+  const restoreResponse = (entry: SavedResponse) => {
+    setQuery(entry.query);
+    setComponent(entry.component as ComponentName);
+    setMode(entry.mode);
+    setDocNeeded(entry.kind === "document");
+    setHasSearched(true);
+    setAiText(entry.response);
+    setAiError("");
+    setAiLoading(false);
+    setGenOpen(false);
+    setResultTab("response");
   };
 
   const handleSearch = async () => {
@@ -212,13 +250,18 @@ function Workspace() {
     setAiText("");
     setAiProgress(0);
     setAiStatusMessage("");
-    const timeframe = mode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
+    setResultTab("response");
+    const requestQuery = query.trim();
+    const requestComponent = component;
+    const requestMode = mode;
+    const requestDocNeeded = docNeeded;
+    const timeframe = requestMode === "standard" ? getStandardTimeframe(fromDate, toDate) : null;
     const requestPayload = {
-      queryText: query.trim(),
-      repoId: REPO_ID_BY_COMPONENT[component],
-      type: mode,
-      limit: 5,
-      endpoint: docNeeded ? "generate-doc" : "search",
+      queryText: requestQuery,
+      repoId: REPO_ID_BY_COMPONENT[requestComponent],
+      type: requestMode,
+      limit: limit ?? 5,
+      endpoint: requestDocNeeded ? "generate-doc" : "search",
       ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
       // unique value to avoid client-side/server-side caching of identical payloads
       bustCache: Date.now(),
@@ -247,12 +290,19 @@ function Workspace() {
         onComplete: (data) => {
           console.info("[RAG UI raw stream response]", data);
           console.info("[RAG UI render source]", {
-            rendersField: docNeeded ? "full generate-doc response" : "answer",
-            rawLlmResponse: docNeeded ? data : data.answer,
+            rendersField: requestDocNeeded ? "full generate-doc response" : "answer",
+            rawLlmResponse: requestDocNeeded ? data : data.answer,
           });
 
-          const answer = docNeeded ? normalizeRagAnswer(data) : rawAnswerText(data.answer);
+          const answer = requestDocNeeded ? normalizeRagAnswer(data) : rawAnswerText(data.answer);
           setAiText(answer);
+          saveResponse({
+            query: requestQuery,
+            response: answer,
+            component: requestComponent,
+            mode: requestMode,
+            kind: requestDocNeeded ? "document" : "answer",
+          });
           setAiProgress(100);
         },
         onError: (message) => {
@@ -288,11 +338,7 @@ function Workspace() {
               {productName}
             </Badge>
           </div>
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-              JS
-            </AvatarFallback>
-          </Avatar>
+          <UserAccountMenu />
         </div>
       </header>
 
@@ -414,71 +460,116 @@ function Workspace() {
           </p>
         )}
 
-        {/* Results */}
-        <section className="mt-6">
-          {!hasSearched ? (
-            <EmptyState
-              examples={EXAMPLE_PROMPTS.filter((example) =>
-                (activeComponents as readonly ComponentName[]).includes(example.component),
-              )}
-              onPick={(example) => {
-                setQuery(example.prompt);
-                setComponent(example.component);
-                setMode(example.mode);
-                setDocNeeded(example.docNeeded ?? false);
-                setHasSearched(false);
-                setAiText("");
-                setAiError("");
-              }}
-            />
-          ) : (
-            <>
-              <div className="mb-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {aiLoading ? (
-                      <>
-                        <TopProgressBar active={aiLoading} inline />
-                        <span>{aiStatusMessage || "Generating answer..."}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3.5 w-3.5" />
-                        {mode === "standard" ? "Orca Ai Generated Answer" : "Orca Ai Generated Answer"}
-                      </>
+        <Tabs value={resultTab} onValueChange={setResultTab} className="mt-6">
+          <TabsList aria-label="Response views">
+            <TabsTrigger value="response">Response</TabsTrigger>
+            <TabsTrigger value="history">
+              History <span className="ml-1 text-xs">{responseHistory.length}</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="response">
+            <section>
+              {!hasSearched ? (
+                isPerfecto ? null : (
+                  <EmptyState
+                    examples={EXAMPLE_PROMPTS.filter((example) =>
+                      (activeComponents as readonly ComponentName[]).includes(example.component),
                     )}
-                  </div>
-                  {!docNeeded && (
-                    <div className="flex shrink-0 gap-2">
-                      <Button size="sm" className="gap-1.5" onClick={() => setGenOpen(true)}>
-                        <FileText className="h-4 w-4" />
-                        Generate Document
-                      </Button>
+                    onPick={(example) => {
+                      setQuery(example.prompt);
+                      setComponent(example.component);
+                      setMode(example.mode);
+                      setHasSearched(false);
+                      setAiText("");
+                      setAiError("");
+                    }}
+                  />
+                )
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {aiLoading ? (
+                          <>
+                            <TopProgressBar active={aiLoading} inline />
+                            <span>{aiStatusMessage || "Generating answer..."}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5" />
+                            {mode === "standard"
+                              ? "Orca Ai Generated Answer"
+                              : "Orca Ai Generated Answer"}
+                          </>
+                        )}
+                      </div>
+                      {!docNeeded && (
+                        <div className="flex shrink-0 gap-2">
+                          <Button size="sm" className="gap-1.5" onClick={() => setGenOpen(true)}>
+                            <FileText className="h-4 w-4" />
+                            Generate Document
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="mt-2">
-                  {aiLoading ? null : aiError ? (
-                    <p className="text-sm text-destructive">{aiError}</p>
-                  ) : aiText ? (
-                    docNeeded ? (
-                      <DocDecisionResult
-                        aiText={aiText}
-                        query={query}
-                        component={component || productName}
-                        repoId={component ? REPO_ID_BY_COMPONENT[component] : ""}
-                      />
-                    ) : (
-                      <MarkdownAnswer markdown={getDisplayMarkdown(aiText)} />
-                    )
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No response yet.</p>
-                  )}
-                </div>
+                    <div className="mt-2">
+                      {aiLoading ? null : aiError ? (
+                        <p className="text-sm text-destructive">{aiError}</p>
+                      ) : aiText ? (
+                        docNeeded ? (
+                          <DocDecisionResult
+                            aiText={aiText}
+                            query={query}
+                            component={component || productName}
+                            repoId={component ? REPO_ID_BY_COMPONENT[component] : ""}
+                          />
+                        ) : (
+                          <MarkdownAnswer markdown={getDisplayMarkdown(aiText)} />
+                        )
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No response yet.</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          </TabsContent>
+          <TabsContent value="history">
+            {responseHistory.length === 0 ? (
+              <p className="border-y border-border py-8 text-center text-sm text-muted-foreground">
+                No saved responses in this session.
+              </p>
+            ) : (
+              <div className="divide-y divide-border border-y border-border">
+                {responseHistory.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => restoreResponse(entry)}
+                    className="flex w-full items-start justify-between gap-4 py-4 text-left transition-colors hover:bg-accent/50"
+                  >
+                    <span className="min-w-0">
+                      <span className="block line-clamp-2 text-sm font-medium text-foreground">
+                        {entry.query}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {entry.component} · {entry.kind === "document" ? "Document" : entry.mode}
+                      </span>
+                    </span>
+                    <time
+                      dateTime={new Date(entry.createdAt).toISOString()}
+                      className="shrink-0 text-xs text-muted-foreground"
+                    >
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </time>
+                  </button>
+                ))}
               </div>
-            </>
-          )}
-        </section>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <GenerateDocumentDialog
@@ -492,6 +583,15 @@ function Workspace() {
         limit={5}
         fromDate={fromDate}
         toDate={toDate}
+        onResponse={(response) =>
+          saveResponse({
+            query: query.trim(),
+            response,
+            component,
+            mode,
+            kind: "document",
+          })
+        }
       />
     </div>
   );
@@ -1228,6 +1328,7 @@ function GenerateDocumentDialog({
   toDate = "",
   providedMarkdown,
   providedTitle,
+  onResponse,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -1241,6 +1342,7 @@ function GenerateDocumentDialog({
   toDate?: string;
   providedMarkdown?: string;
   providedTitle?: string;
+  onResponse?: (response: string) => void;
 }) {
   const [title, setTitle] = useState("");
   const [lastAutoTitle, setLastAutoTitle] = useState("");
@@ -1332,6 +1434,7 @@ function GenerateDocumentDialog({
           console.info("[RAG UI raw generate-doc stream response]", data);
           setDocProgress(100);
           const generatedAnswer = normalizeRagAnswer(data);
+          onResponse?.(generatedAnswer);
           const generatedDoc = parseDocDecisionResponse(generatedAnswer);
           const markdown = addTitleToMarkdown(
             resolvedTitle,
