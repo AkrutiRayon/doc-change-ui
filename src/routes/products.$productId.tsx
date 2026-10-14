@@ -55,7 +55,6 @@ const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as con
 const PERFECTO_COMPONENTS = ["Quantum", "AI-scriptless"] as const;
 const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
-const LIMITS = [10, 15, 20, 25];
 const REPO_ID_BY_COMPONENT: Record<
   | (typeof COMPONENTS)[number]
   | (typeof PERFECTO_COMPONENTS)[number]
@@ -80,27 +79,29 @@ type ExamplePrompt = {
   prompt: string;
   component: ComponentName;
   mode: "standard" | "direct";
+  docNeeded?: boolean;
 };
 const EXAMPLE_PROMPTS: ExamplePrompt[] = [
   {
-    prompt: "What changed in Taurus in the last 30 days?",
+    prompt: "What changed in Taurus?",
     component: "Taurus",
     mode: "standard",
   },
   {
-    prompt: "How do I configure secrets in k6 in Taurus YAML?",
+    prompt: "How to set specific chromedriver version in selenium executor test?",
     component: "Taurus",
-    mode: "direct",
+    mode: "standard",
+    docNeeded: true,
   },
   {
-    prompt: "What changed in the Helm-crane Helm chart?",
+    prompt: "How to configure pod disruption budget for my helm-chart?",
     component: "Helm-crane",
-    mode: "standard",
+    mode: "direct",
   },
   {
-    prompt: "How do I get started with BlazeMeter MCP?",
-    component: "BZM-MCP",
-    mode: "direct",
+    prompt: "What changed in BZM crane?",
+    component: "Crane",
+    mode: "standard",
   },
   {
     prompt: "What changed in p4-mcp in the last 30 days?",
@@ -165,7 +166,6 @@ function Workspace() {
   const [mode, setMode] = useState<"standard" | "direct">("standard");
   const [team, setTeam] = useState<string>("");
   const [component, setComponent] = useState<ComponentName | "">("");
-  const [limit, setLimit] = useState<number | undefined>(undefined);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
@@ -217,7 +217,7 @@ function Workspace() {
       queryText: query.trim(),
       repoId: REPO_ID_BY_COMPONENT[component],
       type: mode,
-      limit: limit ?? 5,
+      limit: 5,
       endpoint: docNeeded ? "generate-doc" : "search",
       ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
       // unique value to avoid client-side/server-side caching of identical payloads
@@ -375,22 +375,6 @@ function Workspace() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={limit === undefined ? "" : String(limit)}
-              onValueChange={(value) => setLimit(Number(value))}
-            >
-              <SelectTrigger className="h-10 w-[110px] !text-black">
-                <SelectValue placeholder="Limit" />
-              </SelectTrigger>
-              <SelectContent>
-                {LIMITS.map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             {mode === "standard" && (
               <TimeframePicker
                 fromDate={fromDate}
@@ -441,6 +425,7 @@ function Workspace() {
                 setQuery(example.prompt);
                 setComponent(example.component);
                 setMode(example.mode);
+                setDocNeeded(example.docNeeded ?? false);
                 setHasSearched(false);
                 setAiText("");
                 setAiError("");
@@ -504,7 +489,7 @@ function Workspace() {
         aiText={aiText}
         component={component}
         mode={mode}
-        limit={limit ?? 5}
+        limit={5}
         fromDate={fromDate}
         toDate={toDate}
       />
