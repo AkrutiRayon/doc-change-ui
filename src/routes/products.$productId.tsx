@@ -260,7 +260,7 @@ function Workspace() {
       queryText: requestQuery,
       repoId: REPO_ID_BY_COMPONENT[requestComponent],
       type: requestMode,
-      limit: limit ?? 5,
+      limit: 5,
       endpoint: requestDocNeeded ? "generate-doc" : "search",
       ...(timeframe ? { fromDate: timeframe.fromDate, toDate: timeframe.toDate } : {}),
       // unique value to avoid client-side/server-side caching of identical payloads
