@@ -284,10 +284,12 @@ function Workspace() {
         payload: finalPayload,
         signal: controller.signal,
         onProgress: (event) => {
+          setAiError("");
           setAiProgress(event.percent);
           if (event.message) setAiStatusMessage(event.message);
         },
         onComplete: (data) => {
+          setAiError("");
           console.info("[RAG UI raw stream response]", data);
           console.info("[RAG UI render source]", {
             rendersField: requestDocNeeded ? "full generate-doc response" : "answer",
@@ -1090,24 +1092,55 @@ async function streamRagRequest({
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let completed = false;
+  let receivedError = false;
+  const handlers = {
+    onProgress,
+    onComplete: (data: any) => {
+      completed = true;
+      onComplete(data);
+    },
+    onError: (message: string) => {
+      receivedError = true;
+      onError(message);
+    },
+  };
 
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-
-    let separatorIndex = buffer.indexOf("\n\n");
-    while (separatorIndex !== -1) {
-      const frame = buffer.slice(0, separatorIndex);
-      buffer = buffer.slice(separatorIndex + 2);
-      handleSseFrame(frame, { onProgress, onComplete, onError });
-      separatorIndex = buffer.indexOf("\n\n");
-    }
+    buffer = consumeSseFrames(buffer, handlers);
   }
 
+  buffer += decoder.decode();
+  buffer = consumeSseFrames(buffer, handlers);
   if (buffer.trim()) {
-    handleSseFrame(buffer, { onProgress, onComplete, onError });
+    handleSseFrame(buffer, handlers);
   }
+  if (!completed && !receivedError && !signal.aborted) {
+    onError("RAG stream ended before the backend sent a complete response.");
+  }
+}
+
+function consumeSseFrames(
+  buffer: string,
+  handlers: {
+    onProgress: (event: RagProgressEvent) => void;
+    onComplete: (data: any) => void;
+    onError: (message: string) => void;
+  },
+): string {
+  const separator = /(?:\r\n|\r|\n){2}/;
+  let match = separator.exec(buffer);
+
+  while (match) {
+    handleSseFrame(buffer.slice(0, match.index), handlers);
+    buffer = buffer.slice(match.index + match[0].length);
+    match = separator.exec(buffer);
+  }
+
+  return buffer;
 }
 
 function handleSseFrame(
@@ -1121,7 +1154,7 @@ function handleSseFrame(
   let eventName = "message";
   const dataLines: string[] = [];
 
-  for (const rawLine of frame.split("\n")) {
+  for (const rawLine of frame.split(/\r\n|\r|\n/)) {
     const line = rawLine.trimEnd();
     if (!line || line.startsWith(":")) continue;
     if (line.startsWith("event:")) {
@@ -1427,10 +1460,12 @@ function GenerateDocumentDialog({
         payload: finalPayload,
         signal: controller.signal,
         onProgress: (event) => {
+          setDocError("");
           setDocProgress(event.percent);
           if (event.message) setDocStatusMessage(event.message);
         },
         onComplete: (data) => {
+          setDocError("");
           console.info("[RAG UI raw generate-doc stream response]", data);
           setDocProgress(100);
           const generatedAnswer = normalizeRagAnswer(data);
