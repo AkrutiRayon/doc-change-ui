@@ -1,0 +1,6 @@
+# Copy this file to .dev.vars and set the RAG_BASE_URL
+# This is used for local development with Cloudflare Wrangler
+
+# The base URL for the RAG API (without protocol or trailing slash)
+# Example: infer.hawk-llm.ai
+RAG_BASE_URL=infer.hawk-llm.ai

@@ -62,7 +62,6 @@ const COMPONENTS = ["Taurus", "Helm-crane", "Crane", "BZM-MCP", "SV-MCP"] as con
 const PERFECTO_COMPONENTS = ["Quantum", "AI-cmd", "scriptless-mobile-backend"] as const;
 const P4_COMPONENTS = ["p4-mcp"] as const;
 const TEAMS = ["Titans", "Sparta", "Atlas", "Phoenix"];
-const LIMITS = [10, 15, 20, 25];
 const REPO_ID_BY_COMPONENT: Record<
   | (typeof COMPONENTS)[number]
   | (typeof PERFECTO_COMPONENTS)[number]
@@ -88,27 +87,29 @@ type ExamplePrompt = {
   prompt: string;
   component: ComponentName;
   mode: "standard" | "direct";
+  docNeeded?: boolean;
 };
 const EXAMPLE_PROMPTS: ExamplePrompt[] = [
   {
-    prompt: "What changed in Taurus in the last 30 days?",
+    prompt: "What changed in Taurus?",
     component: "Taurus",
     mode: "standard",
   },
   {
-    prompt: "How do I configure secrets in k6 in Taurus YAML?",
+    prompt: "How to set specific chromedriver version in selenium executor test?",
     component: "Taurus",
-    mode: "direct",
+    mode: "standard",
+    docNeeded: true,
   },
   {
-    prompt: "What changed in the Helm-crane Helm chart?",
+    prompt: "How to configure pod disruption budget for my helm-chart?",
     component: "Helm-crane",
-    mode: "standard",
+    mode: "direct",
   },
   {
-    prompt: "How do I get started with BlazeMeter MCP?",
-    component: "BZM-MCP",
-    mode: "direct",
+    prompt: "What changed in BZM crane?",
+    component: "Crane",
+    mode: "standard",
   },
   {
     prompt: "What changed in p4-mcp in the last 30 days?",
@@ -118,6 +119,16 @@ const EXAMPLE_PROMPTS: ExamplePrompt[] = [
   {
     prompt: "How do I configure and run the p4 MCP server?",
     component: "p4-mcp",
+    mode: "direct",
+  },
+  {
+    prompt: "What changed in AI-scriptless in the last 30 days?",
+    component: "AI-scriptless",
+    mode: "standard",
+  },
+  {
+    prompt: "How do I get started with AI-scriptless?",
+    component: "AI-scriptless",
     mode: "direct",
   },
 ];
@@ -163,7 +174,6 @@ function Workspace() {
   const [mode, setMode] = useState<"standard" | "direct">("standard");
   const [team, setTeam] = useState<string>("");
   const [component, setComponent] = useState<ComponentName | "">("");
-  const [limit, setLimit] = useState<number | undefined>(undefined);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
@@ -411,22 +421,6 @@ function Workspace() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={limit === undefined ? "" : String(limit)}
-              onValueChange={(value) => setLimit(Number(value))}
-            >
-              <SelectTrigger className="h-10 w-[110px] !text-black">
-                <SelectValue placeholder="Limit" />
-              </SelectTrigger>
-              <SelectContent>
-                {LIMITS.map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             {mode === "standard" && (
               <TimeframePicker
                 fromDate={fromDate}
@@ -586,7 +580,7 @@ function Workspace() {
         aiText={aiText}
         component={component}
         mode={mode}
-        limit={limit ?? 5}
+        limit={5}
         fromDate={fromDate}
         toDate={toDate}
         onResponse={(response) =>

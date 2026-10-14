@@ -5,6 +5,12 @@ export async function proxyRagStream(request: Request, pathSuffix: string): Prom
   const incomingUrl = new URL(request.url);
   const upstreamUrl = `${RAG_BASE_URL}${RAG_PATH}${pathSuffix}${incomingUrl.search}`;
   const body = await request.text();
+  const startupController = new AbortController();
+  const startupTimeout = setTimeout(
+    () =>
+      startupController.abort(new DOMException("RAG stream did not start in time", "TimeoutError")),
+    60_000,
+  );
 
   let upstream: Response;
   try {
@@ -15,13 +21,26 @@ export async function proxyRagStream(request: Request, pathSuffix: string): Prom
         Accept: request.headers.get("accept") ?? "application/json",
       },
       body,
+      signal: AbortSignal.any([request.signal, startupController.signal]),
     });
   } catch (error) {
+    if (startupController.signal.aborted) {
+      return new Response(
+        JSON.stringify({ error: "RAG stream did not start within 60 seconds." }),
+        {
+          status: 504,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const message = error instanceof Error ? error.message : "Unknown fetch failure";
     return new Response(JSON.stringify({ error: `RAG API fetch failed: ${message}` }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
     });
+  } finally {
+    clearTimeout(startupTimeout);
   }
 
   const contentType = upstream.headers.get("content-type") ?? "application/json";
