@@ -191,6 +191,7 @@ function Workspace() {
   const [aiError, setAiError] = useState<string>("");
   const [aiProgress, setAiProgress] = useState(0);
   const [aiStatusMessage, setAiStatusMessage] = useState("");
+  const [aiRequestId, setAiRequestId] = useState("");
   const [docNeeded, setDocNeeded] = useState(false);
   const [resultTab, setResultTab] = useState("response");
   const [responseHistory, setResponseHistory] = useState<SavedResponse[]>([]);
@@ -217,6 +218,7 @@ function Workspace() {
       setAiCancelled(false);
       setAiProgress(0);
       setAiStatusMessage("");
+      setAiRequestId("");
     }
   };
 
@@ -242,6 +244,7 @@ function Workspace() {
     setAiCancelled(false);
     setGenOpen(false);
     setResultTab("response");
+    setAiRequestId("");
   };
 
   const handleSearch = async () => {
@@ -262,6 +265,8 @@ function Workspace() {
     setAiText("");
     setAiProgress(0);
     setAiStatusMessage("");
+    const requestId = createRagRequestId();
+    setAiRequestId(requestId);
     setResultTab("response");
     const requestQuery = query.trim();
     const requestComponent = component;
@@ -295,6 +300,7 @@ function Workspace() {
         endpoint: requestPayload.endpoint,
         payload: finalPayload,
         signal: controller.signal,
+        requestId,
         onProgress: (event) => {
           setAiCancelled(false);
           setAiError("");
@@ -323,13 +329,15 @@ function Workspace() {
         },
         onError: (message) => {
           setAiCancelled(false);
-          setAiError(message);
+          setAiError(formatRagError(message));
         },
       });
     } catch (e) {
       if (controller.signal.aborted || (e instanceof DOMException && e.name === "AbortError"))
         return;
-      setAiError(e instanceof Error ? e.message : "Failed to fetch RAG API response");
+      setAiError(
+        formatRagError(e instanceof Error ? e.message : "Failed to fetch RAG API response"),
+      );
     } finally {
       setAiLoading(false);
       if (searchAbortRef.current === controller) searchAbortRef.current = null;
@@ -543,7 +551,32 @@ function Workspace() {
                       {aiLoading ? null : aiCancelled ? (
                         <p className="text-sm text-muted-foreground">{aiStatusMessage}</p>
                       ) : aiError ? (
-                        <p className="text-sm text-destructive">{aiError}</p>
+                        <div
+                          role="alert"
+                          className="max-w-2xl rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm"
+                        >
+                          <p className="font-medium text-destructive">Search did not complete</p>
+                          <p className="mt-1 text-destructive">{aiError}</p>
+                          {aiStatusMessage && (
+                            <p className="mt-3 text-muted-foreground">
+                              Last backend update: {aiStatusMessage}
+                            </p>
+                          )}
+                          {aiRequestId && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Request ID: <code>{aiRequestId}</code>
+                            </p>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={handleSearch}
+                          >
+                            Retry search
+                          </Button>
+                        </div>
                       ) : aiText ? (
                         docNeeded ? (
                           <DocDecisionResult
@@ -1084,6 +1117,7 @@ async function streamRagRequest({
   endpoint,
   payload,
   signal,
+  requestId,
   onProgress,
   onComplete,
   onError,
@@ -1091,6 +1125,7 @@ async function streamRagRequest({
   endpoint: UiRagRequest["endpoint"];
   payload: BackendRagPayload;
   signal: AbortSignal;
+  requestId: string;
   onProgress: (event: RagProgressEvent) => void;
   onComplete: (data: any) => void;
   onError: (message: string) => void;
@@ -1106,6 +1141,7 @@ async function streamRagRequest({
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
+        "X-Request-Id": requestId,
       },
       body: JSON.stringify(payload),
       signal,
@@ -1118,7 +1154,9 @@ async function streamRagRequest({
 
   if (!response.ok || !response.body) {
     const text = await response.text().catch(() => "");
-    onError(text || `RAG stream request failed with status ${response.status}`);
+    onError(
+      readRagErrorMessage(text) || `RAG stream request failed with status ${response.status}`,
+    );
     return;
   }
 
@@ -1162,6 +1200,33 @@ async function streamRagRequest({
   if (!completed && !receivedError && !signal.aborted) {
     onError("RAG stream ended before the backend sent a complete response.");
   }
+}
+
+function createRagRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `rag-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readRagErrorMessage(body: string) {
+  if (!body.trim()) return "";
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown; message?: unknown };
+    if (typeof parsed.error === "string") return parsed.error;
+    if (typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // Plain-text errors are valid responses from upstream proxies.
+  }
+  return body;
+}
+
+function formatRagError(message: string) {
+  const detail = readRagErrorMessage(message).trim();
+  if (detail.toLowerCase() === "network error") {
+    return "The RAG backend reported a network error while processing a batch.";
+  }
+  return detail || "The RAG request failed without an error message.";
 }
 
 function consumeSseFrames(

@@ -7,6 +7,7 @@ export async function proxyRagStream(request: Request, pathSuffix: string): Prom
   const incomingUrl = new URL(request.url);
   const upstreamUrl = `${RAG_BASE_URL}${RAG_PATH}${pathSuffix}${incomingUrl.search}`;
   const body = await request.text();
+  const requestId = safeRequestId(request.headers.get("x-request-id"));
 
   let upstream: Response;
   try {
@@ -17,12 +18,13 @@ export async function proxyRagStream(request: Request, pathSuffix: string): Prom
         Accept: request.headers.get("accept") ?? "application/json",
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
+        ...(requestId ? { "X-Request-Id": requestId } : {}),
       },
       body,
       signal: request.signal,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown fetch failure";
+    const message = fetchFailureMessage(error);
     return new Response(JSON.stringify({ error: `RAG API fetch failed: ${message}` }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
@@ -37,6 +39,7 @@ export async function proxyRagStream(request: Request, pathSuffix: string): Prom
     status: upstream.status,
     headers: new Headers({
       "Content-Type": contentType,
+      ...(requestId ? { "X-Request-Id": requestId } : {}),
       ...(isEventStream
         ? {
             "Cache-Control": "no-cache, no-transform",
@@ -45,6 +48,20 @@ export async function proxyRagStream(request: Request, pathSuffix: string): Prom
         : {}),
     }),
   });
+}
+
+function fetchFailureMessage(error: unknown): string {
+  if (!(error instanceof Error)) return "Unknown fetch failure";
+  const cause = error.cause;
+  if (cause instanceof Error && cause.message) {
+    return `${error.message}: ${cause.message}`;
+  }
+  return error.message;
+}
+
+function safeRequestId(value: string | null): string | undefined {
+  if (!value || !/^[A-Za-z0-9._-]{1,128}$/.test(value)) return undefined;
+  return value;
 }
 
 function keepEventStreamAlive(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
