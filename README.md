@@ -1,4 +1,5 @@
 # ORCA UI Authentication
+
 # Doc Change UI
 
 A Tanstack React Router + React Start application for AI-powered documentation and code change search.
@@ -6,6 +7,7 @@ A Tanstack React Router + React Start application for AI-powered documentation a
 ## Development Setup
 
 ### Prerequisites
+
 - Node.js (v18+)
 - Bun or npm
 
@@ -14,11 +16,13 @@ A Tanstack React Router + React Start application for AI-powered documentation a
 For development, you need to configure the RAG API base URL using the `.dev.vars` file (loaded by Nitro):
 
 1. **Copy the environment template:**
+
    ```bash
    cp .dev.vars.example .dev.vars
    ```
 
 2. **Edit `.dev.vars` and set the RAG API URL:**
+
    ```env
    RAG_BASE_URL=infer.hawk-llm.ai
    ```
@@ -50,9 +54,24 @@ The application will be available at `http://localhost:8080`.
 
 The application proxies RAG API requests through the server to avoid CORS issues. All API calls are made server-side.
 
+## Feedback service
+
+Completed Orca responses expose optional feedback controls. The browser sends the existing Keycloak bearer token only to the same-origin `/api/v1/rag-go/feedback` route. That server-side route validates the token signature against the configured Keycloak issuer JWKS, checks issuer and audience, derives `sub`, ignores any browser-supplied identity header, and forwards `X-User-ID` only to the private feedback service.
+
+Configure these server-only values in the UI deployment:
+
+```dotenv
+FEEDBACK_BASE_URL=http://orca-feedback:8080
+KEYCLOAK_ISSUER=https://orca-infer.ai/auth/realms/orca
+KEYCLOAK_AUDIENCE=<exact access-token aud claim>
+```
+
+`KEYCLOAK_AUDIENCE` is required; feedback fails closed when it is absent. Route `/api/v1/rag-go/feedback` must be routed by the UI application to this proxy, and `FEEDBACK_BASE_URL` must reach the feedback microservice—not the inference service. Keep that microservice private. The feedback proxy never forwards a browser `X-User-ID` header.
+
 ### Request Payload Structure
 
 **Standard Search (with timeframe):**
+
 ```json
 {
   "query_text": "What changed in helm-crane?",
@@ -65,6 +84,7 @@ The application proxies RAG API requests through the server to avoid CORS issues
 ```
 
 **Standard Search (without timeframe - backend defaults to last 30 days):**
+
 ```json
 {
   "query_text": "What changed in helm-crane?",
@@ -75,6 +95,7 @@ The application proxies RAG API requests through the server to avoid CORS issues
 ```
 
 **Direct Search (no timeframe):**
+
 ```json
 {
   "query_text": "Is gatling 3.19 supported?",

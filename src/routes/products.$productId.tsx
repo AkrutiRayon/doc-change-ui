@@ -4,14 +4,7 @@ import { differenceInCalendarDays } from "date-fns";
 import { getProduct } from "@/data/products";
 import orcLogo from "@/assets/logos/orc.png";
 import { TopProgressBar } from "@/components/TopProgressBar";
-import {
-  ArrowLeft,
-  Calendar as CalendarIcon,
-  FileText,
-  Loader2,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, FileText, Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +31,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FeedbackControls } from "@/components/FeedbackControls";
 import { getKeycloakSubject } from "@/lib/keycloak";
+import {
+  isCanonicalRequestId,
+  isOrcaResponse,
+  type FeedbackTransaction,
+  type FeedbackWorkflow,
+} from "@/lib/feedback.types";
 import {
   readResponseHistory,
   saveResponseHistoryEntry,
@@ -192,6 +192,7 @@ function Workspace() {
   const [aiProgress, setAiProgress] = useState(0);
   const [aiStatusMessage, setAiStatusMessage] = useState("");
   const [aiRequestId, setAiRequestId] = useState("");
+  const [feedbackTransaction, setFeedbackTransaction] = useState<FeedbackTransaction | null>(null);
   const [docNeeded, setDocNeeded] = useState(false);
   const [resultTab, setResultTab] = useState("response");
   const [responseHistory, setResponseHistory] = useState<SavedResponse[]>([]);
@@ -219,6 +220,7 @@ function Workspace() {
       setAiProgress(0);
       setAiStatusMessage("");
       setAiRequestId("");
+      setFeedbackTransaction(null);
     }
   };
 
@@ -245,6 +247,7 @@ function Workspace() {
     setGenOpen(false);
     setResultTab("response");
     setAiRequestId("");
+    setFeedbackTransaction(null);
   };
 
   const handleSearch = async () => {
@@ -265,6 +268,7 @@ function Workspace() {
     setAiText("");
     setAiProgress(0);
     setAiStatusMessage("");
+    setFeedbackTransaction(null);
     const requestId = createRagRequestId();
     setAiRequestId(requestId);
     setResultTab("response");
@@ -285,12 +289,6 @@ function Workspace() {
     } as const;
     const finalPayload = toBackendPayload(requestPayload);
 
-    console.info("[RAG UI final payload]", finalPayload);
-    console.info(
-      "[RAG UI curl equivalent]",
-      buildCurlEquivalent(finalPayload, requestPayload.endpoint),
-    );
-
     searchAbortRef.current?.abort();
     const controller = new AbortController();
     searchAbortRef.current = controller;
@@ -307,17 +305,19 @@ function Workspace() {
           setAiProgress(event.percent);
           if (event.message) setAiStatusMessage(event.message);
         },
-        onComplete: (data) => {
+        onComplete: (data, completedRequestId) => {
           setAiCancelled(false);
           setAiError("");
-          console.info("[RAG UI raw stream response]", data);
-          console.info("[RAG UI render source]", {
-            rendersField: requestDocNeeded ? "full generate-doc response" : "answer",
-            rawLlmResponse: requestDocNeeded ? data : data.answer,
-          });
-
           const answer = requestDocNeeded ? normalizeRagAnswer(data) : rawAnswerText(data.answer);
           setAiText(answer);
+          setFeedbackTransaction(
+            toFeedbackTransaction(
+              requestDocNeeded ? "generate-doc" : requestMode,
+              finalPayload,
+              data,
+              completedRequestId,
+            ),
+          );
           saveResponse({
             query: requestQuery,
             response: answer,
@@ -578,16 +578,24 @@ function Workspace() {
                           </Button>
                         </div>
                       ) : aiText ? (
-                        docNeeded ? (
-                          <DocDecisionResult
-                            aiText={aiText}
-                            query={query}
-                            component={component || productName}
-                            repoId={component ? REPO_ID_BY_COMPONENT[component] : ""}
-                          />
-                        ) : (
-                          <MarkdownAnswer markdown={getDisplayMarkdown(aiText)} />
-                        )
+                        <>
+                          {docNeeded ? (
+                            <DocDecisionResult
+                              aiText={aiText}
+                              query={query}
+                              component={component || productName}
+                              repoId={component ? REPO_ID_BY_COMPONENT[component] : ""}
+                            />
+                          ) : (
+                            <MarkdownAnswer markdown={getDisplayMarkdown(aiText)} />
+                          )}
+                          {feedbackTransaction && (
+                            <FeedbackControls
+                              key={feedbackTransaction.request_id}
+                              transaction={feedbackTransaction}
+                            />
+                          )}
+                        </>
                       ) : (
                         <p className="text-sm text-muted-foreground">No response yet.</p>
                       )}
@@ -644,15 +652,16 @@ function Workspace() {
         limit={5}
         fromDate={fromDate}
         toDate={toDate}
-        onResponse={(response) =>
+        onResponse={(response, transaction) => {
+          setFeedbackTransaction(transaction);
           saveResponse({
             query: query.trim(),
             response,
             component,
             mode,
             kind: "document",
-          })
-        }
+          });
+        }}
       />
     </div>
   );
@@ -1101,16 +1110,17 @@ function toBackendPayload(request: UiRagRequest): BackendRagPayload {
   };
 }
 
-function buildCurlEquivalent(payload: BackendRagPayload, endpoint: UiRagRequest["endpoint"]) {
-  const path = endpoint === "generate-doc" ? "/api/v1/rag-go/generate-doc" : "/api/v1/rag-go";
-  return [
-    `curl -X POST "http://orca-infer.ai${path}" \\`,
-    `  -H "Content-Type: application/json" \\`,
-    `  -d '${JSON.stringify(payload, null, 2)}'`,
-  ].join("\n");
-}
-
 type RagProgressEvent = { stage: string; message?: string; percent: number };
+
+function toFeedbackTransaction(
+  workflow: FeedbackWorkflow,
+  request: BackendRagPayload,
+  response: unknown,
+  requestId: string,
+): FeedbackTransaction | null {
+  if (!isCanonicalRequestId(requestId) || !isOrcaResponse(response)) return null;
+  return { workflow, request_id: requestId, request, response };
+}
 
 // EventSource only supports GET, so SSE progress is consumed manually over a POST fetch stream.
 async function streamRagRequest({
@@ -1127,7 +1137,7 @@ async function streamRagRequest({
   signal: AbortSignal;
   requestId: string;
   onProgress: (event: RagProgressEvent) => void;
-  onComplete: (data: any) => void;
+  onComplete: (data: any, requestId: string) => void;
   onError: (message: string) => void;
 }) {
   const base = import.meta.env.BASE_URL.replace(/\/+$/, "");
@@ -1161,6 +1171,7 @@ async function streamRagRequest({
   }
 
   const reader = response.body.getReader();
+  const responseRequestId = response.headers.get("x-request-id")?.toLowerCase() || requestId;
   const decoder = new TextDecoder();
   let buffer = "";
   let completed = false;
@@ -1169,7 +1180,7 @@ async function streamRagRequest({
     onProgress,
     onComplete: (data: any) => {
       completed = true;
-      onComplete(data);
+      onComplete(data, responseRequestId);
     },
     onError: (message: string) => {
       receivedError = true;
@@ -1481,7 +1492,7 @@ function GenerateDocumentDialog({
   toDate?: string;
   providedMarkdown?: string;
   providedTitle?: string;
-  onResponse?: (response: string) => void;
+  onResponse?: (response: string, transaction: FeedbackTransaction | null) => void;
 }) {
   const [title, setTitle] = useState("");
   const [lastAutoTitle, setLastAutoTitle] = useState("");
@@ -1572,28 +1583,26 @@ function GenerateDocumentDialog({
         bustCache: Date.now(),
       } as const;
       const finalPayload = toBackendPayload(requestPayload);
-      console.info("[RAG UI document final payload]", finalPayload);
-      console.info(
-        "[RAG UI document curl equivalent]",
-        buildCurlEquivalent(finalPayload, "generate-doc"),
-      );
-
+      const requestId = createRagRequestId();
       await streamRagRequest({
         endpoint: "generate-doc",
         payload: finalPayload,
         signal: controller.signal,
+        requestId,
         onProgress: (event) => {
           setDocError("");
           setDocProgress(event.percent);
           if (event.message) setDocStatusMessage(event.message);
         },
-        onComplete: (data) => {
+        onComplete: (data, completedRequestId) => {
           docCompletedRef.current = true;
           setDocError("");
-          console.info("[RAG UI raw generate-doc stream response]", data);
           setDocProgress(100);
           const generatedAnswer = normalizeRagAnswer(data);
-          onResponse?.(generatedAnswer);
+          onResponse?.(
+            generatedAnswer,
+            toFeedbackTransaction("generate-doc", finalPayload, data, completedRequestId),
+          );
           const generatedDoc = parseDocDecisionResponse(generatedAnswer);
           const markdown = addTitleToMarkdown(
             resolvedTitle,
