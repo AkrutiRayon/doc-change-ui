@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, errors, jwtVerify } from "jose";
 import {
   FEEDBACK_BASE_URL,
   KEYCLOAK_AUDIENCE,
@@ -62,8 +62,16 @@ async function verifiedSubject(token: string): Promise<string | undefined> {
       issuer,
       audience: KEYCLOAK_AUDIENCE!,
     });
-    return typeof payload.sub === "string" && payload.sub ? payload.sub : undefined;
-  } catch {
+    if (typeof payload.sub === "string" && payload.sub) return payload.sub;
+    console.warn("[Feedback authentication failed]", { code: "MISSING_SUBJECT" });
+    return undefined;
+  } catch (error) {
+    console.warn("[Feedback authentication failed]", {
+      code: error instanceof errors.JOSEError ? error.code : "KEYCLOAK_JWKS_REQUEST_FAILED",
+      claim: error instanceof errors.JWTClaimValidationFailed ? error.claim : undefined,
+      issuer: KEYCLOAK_ISSUER,
+      audience: KEYCLOAK_AUDIENCE,
+    });
     return undefined;
   }
 }
