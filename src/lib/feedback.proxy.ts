@@ -3,10 +3,11 @@ import {
   FEEDBACK_BASE_URL,
   KEYCLOAK_AUDIENCE,
   KEYCLOAK_ISSUER,
+  KEYCLOAK_JWKS_URL,
   feedbackConfigurationError,
 } from "@/lib/feedback.config";
 
-const jwksByIssuer = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+const jwksByUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
 export async function proxyFeedback(request: Request): Promise<Response> {
   const configurationError = feedbackConfigurationError();
@@ -54,10 +55,9 @@ export async function proxyFeedback(request: Request): Promise<Response> {
 async function verifiedSubject(token: string): Promise<string | undefined> {
   try {
     const issuer = KEYCLOAK_ISSUER!;
-    const jwks =
-      jwksByIssuer.get(issuer) ??
-      createRemoteJWKSet(new URL(`${issuer}/protocol/openid-connect/certs`));
-    jwksByIssuer.set(issuer, jwks);
+    const jwksUrl = KEYCLOAK_JWKS_URL ?? `${issuer}/protocol/openid-connect/certs`;
+    const jwks = jwksByUrl.get(jwksUrl) ?? createRemoteJWKSet(new URL(jwksUrl));
+    jwksByUrl.set(jwksUrl, jwks);
     const { payload } = await jwtVerify(token, jwks, {
       issuer,
       audience: KEYCLOAK_AUDIENCE!,

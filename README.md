@@ -68,6 +68,14 @@ KEYCLOAK_AUDIENCE=<exact access-token aud claim>
 
 `KEYCLOAK_AUDIENCE` is required; feedback fails closed when it is absent. Route `/api/v1/rag-go/feedback` must be routed by the UI application to this proxy, and `FEEDBACK_BASE_URL` must reach the feedback microservice—not the inference service. Keep that microservice private. The feedback proxy never forwards a browser `X-User-ID` header.
 
+If the UI pod cannot resolve or reach the public issuer, configure an optional server-only signing-key URL:
+
+```dotenv
+KEYCLOAK_JWKS_URL=http://kc-keycloakx-http.hawk.svc.cluster.local/auth/realms/orca/protocol/openid-connect/certs
+```
+
+Adjust the service, namespace, port, and Keycloak path for your deployment. This URL must return Keycloak's JWKS JSON directly. Keep `KEYCLOAK_ISSUER` equal to the access token's public `iss` claim; the override changes only where signing keys are fetched, not issuer or audience validation. Without the override, the proxy uses `${KEYCLOAK_ISSUER}/protocol/openid-connect/certs`. Use only a trusted endpoint for the same realm, with HTTPS or a protected internal connection, since its keys determine which signatures the proxy trusts.
+
 ### Request Payload Structure
 
 **Standard Search (with timeframe):**
