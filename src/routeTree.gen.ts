@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiRuntimeConfigRouteImport } from './routes/api.runtime-config'
 import { Route as ProductsProductIdRouteImport } from './routes/products.$productId'
 import { Route as ApiV1RagGoRouteImport } from './routes/api.v1.rag-go'
+import { Route as ApiV1RagGoFeedbackRouteImport } from './routes/api.v1.rag-go.feedback'
 import { Route as ApiV1RagGoGenerateDocRouteImport } from './routes/api.v1.rag-go.generate-doc'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const ApiV1RagGoRoute = ApiV1RagGoRouteImport.update({
   path: '/api/v1/rag-go',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiV1RagGoFeedbackRoute = ApiV1RagGoFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => ApiV1RagGoRoute,
+} as any)
 const ApiV1RagGoGenerateDocRoute = ApiV1RagGoGenerateDocRouteImport.update({
   id: '/generate-doc',
   path: '/generate-doc',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/api/runtime-config': typeof ApiRuntimeConfigRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
+  '/api/v1/rag-go/feedback': typeof ApiV1RagGoFeedbackRoute
   '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/api/runtime-config': typeof ApiRuntimeConfigRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
+  '/api/v1/rag-go/feedback': typeof ApiV1RagGoFeedbackRoute
   '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRoutesById {
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   '/api/runtime-config': typeof ApiRuntimeConfigRoute
   '/products/$productId': typeof ProductsProductIdRoute
   '/api/v1/rag-go': typeof ApiV1RagGoRouteWithChildren
+  '/api/v1/rag-go/feedback': typeof ApiV1RagGoFeedbackRoute
   '/api/v1/rag-go/generate-doc': typeof ApiV1RagGoGenerateDocRoute
 }
 export interface FileRouteTypes {
@@ -70,6 +79,7 @@ export interface FileRouteTypes {
     | '/api/runtime-config'
     | '/products/$productId'
     | '/api/v1/rag-go'
+    | '/api/v1/rag-go/feedback'
     | '/api/v1/rag-go/generate-doc'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -77,6 +87,7 @@ export interface FileRouteTypes {
     | '/api/runtime-config'
     | '/products/$productId'
     | '/api/v1/rag-go'
+    | '/api/v1/rag-go/feedback'
     | '/api/v1/rag-go/generate-doc'
   id:
     | '__root__'
@@ -84,6 +95,7 @@ export interface FileRouteTypes {
     | '/api/runtime-config'
     | '/products/$productId'
     | '/api/v1/rag-go'
+    | '/api/v1/rag-go/feedback'
     | '/api/v1/rag-go/generate-doc'
   fileRoutesById: FileRoutesById
 }
@@ -124,6 +136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1RagGoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/rag-go/feedback': {
+      id: '/api/v1/rag-go/feedback'
+      path: '/feedback'
+      fullPath: '/api/v1/rag-go/feedback'
+      preLoaderRoute: typeof ApiV1RagGoFeedbackRouteImport
+      parentRoute: typeof ApiV1RagGoRoute
+    }
     '/api/v1/rag-go/generate-doc': {
       id: '/api/v1/rag-go/generate-doc'
       path: '/generate-doc'
@@ -135,10 +154,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface ApiV1RagGoRouteChildren {
+  ApiV1RagGoFeedbackRoute: typeof ApiV1RagGoFeedbackRoute
   ApiV1RagGoGenerateDocRoute: typeof ApiV1RagGoGenerateDocRoute
 }
 
 const ApiV1RagGoRouteChildren: ApiV1RagGoRouteChildren = {
+  ApiV1RagGoFeedbackRoute: ApiV1RagGoFeedbackRoute,
   ApiV1RagGoGenerateDocRoute: ApiV1RagGoGenerateDocRoute,
 }
 
